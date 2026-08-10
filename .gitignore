@@ -1,0 +1,63 @@
+# ── Entornos y Secretos ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+*.env
+
+# ── Node.js / npm ────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Build / Compilados ───────────────────────────────────────────────────────
+dist/
+build/
+*.js.map
+
+# ── SQLite (base de datos local) ─────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# ── Scripts temporales de inspección/debug ───────────────────────────────────
+backend/src/inspect_*.js
+backend/src/seed_from_coficab_excel.js
+
+# ── Archivos sensibles de datos ──────────────────────────────────────────────
+*.xlsx
+*.xls
+*.csv
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Sistema Operativo ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── Docker local overrides ───────────────────────────────────────────────────
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ── Vite cache ───────────────────────────────────────────────────────────────
+frontend/.vite/
+frontend/node_modules/
+
+# ── Backups ──────────────────────────────────────────────────────────────────
+*.bak
+*.backup
