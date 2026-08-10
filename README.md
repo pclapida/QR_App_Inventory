@@ -6,15 +6,15 @@ Sistema de inventario con código QR para gestión de equipos de TI y operativos
 
 ## Características principales
 
-- 📦 **Inventario Dual** — Equipos de planta y equipos internos de TI en una sola app
-- 📷 **Escaneo QR** — Consulta y movimientos de equipos escaneando desde celular o lector
-- 🔐 **Autenticación JWT** — Roles de Administrador y Usuario
-- 📊 **Dashboard TV** — Vista de pantalla completa para inventario IT u Operativo
-- 🔧 **Mantenimientos** — Registro y seguimiento de mantenimientos preventivos por tipo de equipo
-- 📋 **Responsiva Digital** — Genera cartas de asignación con fotos y políticas listas para firmar e imprimir (funciona en móvil)
-- 📈 **Órdenes de Compra** — Seguimiento de pedidos a proveedores
-- 🚨 **Alertas de Stock** — Notificación por categoría cuando el stock baja del mínimo
-- 📥 **Importación Excel** — Carga masiva de inventario desde archivo .xlsx
+- **Inventario Dual** — Equipos de planta y equipos internos de TI en una sola app
+- **Escaneo QR** — Consulta y movimientos de equipos escaneando desde celular o lector
+- **Autenticación JWT** — Roles de Administrador y Usuario
+- **Dashboard TV** — Vista de pantalla completa para inventario IT u Operativo
+- **Mantenimientos** — Registro y seguimiento de mantenimientos preventivos por tipo de equipo
+- **Responsiva Digital** — Genera cartas de asignación con fotos y políticas listas para firmar e imprimir (funciona en móvil)
+- **Órdenes de Compra** — Seguimiento de pedidos a proveedores
+- **Alertas de Stock** — Notificación por categoría cuando el stock baja del mínimo
+- **Importación Excel** — Carga masiva de inventario desde archivo .xlsx
 
 ---
 
@@ -50,7 +50,7 @@ cp backend/.env.example backend/.env
 # Edita backend/.env con los mismos valores
 ```
 
-> ⚠️ **IMPORTANTE:** Genera un JWT_SECRET seguro con:
+> **IMPORTANTE:** Genera un JWT_SECRET seguro con:
 > ```bash
 > node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 > ```
