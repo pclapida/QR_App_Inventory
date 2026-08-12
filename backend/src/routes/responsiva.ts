@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -41,7 +41,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // ─── POST /api/responsivas — Guardar nueva responsiva ────────────────────────
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
       itemId,
@@ -95,7 +95,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // ─── POST /api/responsivas/send-email — Enviar responsiva por correo ─────────
-router.post('/send-email', authenticateToken, async (req, res) => {
+router.post('/send-email', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { responsivaId, pdfBase64, toEmail, colaborador, nombreEquipo } = req.body;
 
