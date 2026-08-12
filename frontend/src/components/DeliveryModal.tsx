@@ -6,6 +6,8 @@ import {
 import { Item, responsivasApi } from '../services/api';
 import { openPrintWindow } from './ResponsivaModal';
 import api from '../services/api';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeliveryFormData {
@@ -196,13 +198,17 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, i
   const [savedId, setSavedId] = useState<string | null>(null);
 
   // Step 1: delivery data
-  const [delivery, setDelivery] = useState<DeliveryFormData>({ colaborador: '', email: '', puesto: '' });
+  const [delivery, setDelivery] = useState<DeliveryFormData>({ 
+    colaborador: item?.assignedTo || '', 
+    email: '', 
+    puesto: '' 
+  });
 
   // Step 2: responsiva data
   const [responsiva, setResponsiva] = useState<ResponsivaFormData>({
-    marcaModelo: '',
-    serie: '',
-    nombreEquipo: '',
+    marcaModelo: item?.model ? `${item.name} (${item.model})` : (item?.name || ''),
+    serie: item?.serialNumber || '',
+    nombreEquipo: item?.sku || '',
     accesorios: { cargador: false, mouse: false, audifonos: false, adaptador: false, otro: false, otroText: '' },
     estado: 'Buen estado general. Funciona correctamente.',
     photoUrls: []
@@ -212,23 +218,6 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, i
   const [printing, setPrinting] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult, setEmailResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  useEffect(() => {
-    if (isOpen && item) {
-      setStep('delivery');
-      setSavedId(null);
-      setEmailResult(null);
-      setDelivery({ colaborador: item.assignedTo || '', email: '', puesto: '' });
-      setResponsiva({
-        marcaModelo: item.model ? `${item.name} (${item.model})` : item.name || '',
-        serie: item.serialNumber || '',
-        nombreEquipo: item.sku || '',
-        accesorios: { cargador: false, mouse: false, audifonos: false, adaptador: false, otro: false, otroText: '' },
-        estado: 'Buen estado general. Funciona correctamente.',
-        photoUrls: []
-      });
-    }
-  }, [isOpen, item]);
 
   if (!isOpen || !item) return null;
 
@@ -271,10 +260,18 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, i
     setPrinting(true);
     try {
       const html = await buildResponsivaHTML(item, delivery, responsiva);
-      const win = window.open('', '_blank');
-      if (!win) { alert('Permite ventanas emergentes para imprimir.'); return; }
-      win.document.write(html);
-      win.document.close();
+      const opt = {
+        margin:       10,
+        filename:     `Responsiva_${item.sku}_${delivery.colaborador.replace(/\s+/g, '_')}.pdf`,
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' as const }
+      };
+      // Forzar la descarga del PDF sin abrir ventana emergente
+      await html2pdf().set(opt).from(html).save();
+    } catch (err) {
+      console.error('Error generando PDF', err);
+      alert('Hubo un error al generar el PDF.');
     } finally {
       setPrinting(false);
     }
@@ -286,9 +283,20 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, i
     setEmailResult(null);
     try {
       const html = await buildResponsivaHTML(item, delivery, responsiva);
+      const opt = {
+        margin:       10,
+        filename:     'Responsiva.pdf',
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' as const }
+      };
+      
+      // Generar PDF en Base64
+      const pdfBase64 = await html2pdf().set(opt).from(html).outputPdf('datauristring');
+
       const res = await api.post('/responsivas/send-email', {
         responsivaId: savedId,
-        htmlContent: html,
+        pdfBase64: pdfBase64,
         toEmail: delivery.email,
         colaborador: delivery.colaborador,
         nombreEquipo: responsiva.nombreEquipo

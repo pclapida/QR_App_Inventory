@@ -55,20 +55,27 @@ router.post('/', authenticateToken, async (req, res) => {
       email
     } = req.body;
 
-    const newHistory = await prisma.responsivaHistory.create({
-      data: {
-        itemId,
-        colaborador,
-        marcaModelo,
-        serie,
-        nombreEquipo,
-        accesoriosJson: JSON.stringify(accesorios),
-        observaciones: observaciones || '',
-        photoUrlsJson: JSON.stringify(photoUrls || []),
-        email: email || null,
-        emailSent: false
-      }
-    });
+    // Actualizar el historial y el equipo en una transacción
+    const [newHistory, updatedItem] = await prisma.$transaction([
+      prisma.responsivaHistory.create({
+        data: {
+          itemId,
+          colaborador,
+          marcaModelo,
+          serie,
+          nombreEquipo,
+          accesoriosJson: JSON.stringify(accesorios),
+          observaciones: observaciones || '',
+          photoUrlsJson: JSON.stringify(photoUrls || []),
+          email: email || null,
+          emailSent: false
+        }
+      }),
+      prisma.item.update({
+        where: { id: itemId },
+        data: { assignedTo: colaborador }
+      })
+    ]);
 
     res.status(201).json(newHistory);
   } catch (error) {
@@ -80,10 +87,10 @@ router.post('/', authenticateToken, async (req, res) => {
 // ─── POST /api/responsivas/send-email — Enviar responsiva por correo ─────────
 router.post('/send-email', authenticateToken, async (req, res) => {
   try {
-    const { responsivaId, htmlContent, toEmail, colaborador, nombreEquipo } = req.body;
+    const { responsivaId, pdfBase64, toEmail, colaborador, nombreEquipo } = req.body;
 
-    if (!toEmail || !htmlContent) {
-      return res.status(400).json({ error: 'Se requiere el correo destino y el contenido HTML.' });
+    if (!toEmail || !pdfBase64) {
+      return res.status(400).json({ error: 'Se requiere el correo destino y el PDF en base64.' });
     }
 
     const transporter = createTransporter();
@@ -95,6 +102,9 @@ router.post('/send-email', authenticateToken, async (req, res) => {
 
     const fromName = process.env.SMTP_FROM || 'IT COFICAB <ti@coficab.com>';
 
+    // Remove the data URL prefix (e.g. "data:application/pdf;base64,") to get raw base64
+    const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+
     await transporter.sendMail({
       from: fromName,
       to: toEmail,
@@ -104,10 +114,15 @@ router.post('/send-email', authenticateToken, async (req, res) => {
         <p>Adjunto encontrará su <strong>Carta Responsiva</strong> de entrega de equipo IT por parte del departamento de Tecnología de COFICAB.</p>
         <p>Por favor conserve este documento. Si tiene alguna pregunta, no dude en contactarnos.</p>
         <hr>
-        ${htmlContent}
-        <hr>
         <p style="font-size:12px;color:#999;">Este correo fue generado automáticamente por el sistema de inventario COFICAB IT.</p>
-      `
+      `,
+      attachments: [
+        {
+          filename: `Responsiva_${nombreEquipo || 'IT'}.pdf`,
+          content: base64Data,
+          encoding: 'base64'
+        }
+      ]
     });
 
     // Update emailSent flag in DB if we have the ID
