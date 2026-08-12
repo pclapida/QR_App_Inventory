@@ -49,9 +49,9 @@ router.post('/', authenticateToken, async (req, res) => {
       marcaModelo,
       serie,
       nombreEquipo,
-      accesorios,
+      accesoriosJson,
       observaciones,
-      photoUrls,
+      photoUrlsJson,
       email
     } = req.body;
 
@@ -64,9 +64,9 @@ router.post('/', authenticateToken, async (req, res) => {
           marcaModelo,
           serie,
           nombreEquipo,
-          accesoriosJson: JSON.stringify(accesorios),
+          accesoriosJson: accesoriosJson || '{}',
           observaciones: observaciones || '',
-          photoUrlsJson: JSON.stringify(photoUrls || []),
+          photoUrlsJson: photoUrlsJson || '[]',
           email: email || null,
           emailSent: false
         }
