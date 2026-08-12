@@ -74,6 +74,16 @@ router.post('/', authenticateToken, async (req, res) => {
       prisma.item.update({
         where: { id: itemId },
         data: { assignedTo: colaborador }
+      }),
+      prisma.transaction.create({
+        data: {
+          itemId: itemId,
+          userId: req.user!.id,
+          type: 'ASIGNACIÓN',
+          quantity: 0,
+          assignedTo: colaborador,
+          notes: 'Entrega de equipo y generación de responsiva IT'
+        }
       })
     ]);
 
