@@ -82,30 +82,23 @@ async function buildResponsivaHTML(
   const otroHtml = responsiva.accesorios.otro
     ? cb(true, `Otro: ${responsiva.accesorios.otroText}`) : '';
 
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Responsiva - ${delivery.colaborador}</title>
+  return `<div id="responsiva-pdf-content">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; background: #fff; padding: 1.5cm; }
-  h1 { text-align: center; font-size: 13pt; font-weight: bold; text-transform: uppercase; margin-bottom: 18px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 18px; }
-  .section-title { font-weight: bold; font-size: 11pt; margin-top: 16px; margin-bottom: 6px; }
-  ul { padding-left: 20px; margin-top: 4px; margin-bottom: 8px; }
-  li { margin-bottom: 3px; text-align: justify; }
-  p { text-align: justify; margin-bottom: 8px; }
-  .data-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-  .data-table td { padding: 5px 0; vertical-align: top; }
-  .data-table td:first-child { font-weight: bold; width: 35%; }
-  .data-table td:last-child { border-bottom: 1px solid #000; padding-left: 8px; }
-  .sig-row { display: flex; justify-content: space-around; margin-top: 60px; gap: 2rem; }
-  .sig-box { flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 6px; }
-  @media print { @page { margin: 1.5cm; size: letter; } body { padding: 0; } }
+  #responsiva-pdf-content { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000 !important; background: #fff !important; padding: 1.5cm; }
+  #responsiva-pdf-content * { box-sizing: border-box; margin: 0; padding: 0; color: #000 !important; }
+  #responsiva-pdf-content h1 { text-align: center; font-size: 13pt; font-weight: bold; text-transform: uppercase; margin-bottom: 18px; }
+  #responsiva-pdf-content .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 18px; }
+  #responsiva-pdf-content .section-title { font-weight: bold; font-size: 11pt; margin-top: 16px; margin-bottom: 6px; }
+  #responsiva-pdf-content ul { padding-left: 20px; margin-top: 4px; margin-bottom: 8px; }
+  #responsiva-pdf-content li { margin-bottom: 3px; text-align: justify; }
+  #responsiva-pdf-content p { text-align: justify; margin-bottom: 8px; }
+  #responsiva-pdf-content .data-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  #responsiva-pdf-content .data-table td { padding: 5px 0; vertical-align: top; }
+  #responsiva-pdf-content .data-table td:first-child { font-weight: bold; width: 35%; }
+  #responsiva-pdf-content .data-table td:last-child { border-bottom: 1px solid #000; padding-left: 8px; }
+  #responsiva-pdf-content .sig-row { display: flex; justify-content: space-around; margin-top: 60px; gap: 2rem; }
+  #responsiva-pdf-content .sig-box { flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 6px; }
 </style>
-</head>
-<body>
 
 <div class="header">
   <div>
@@ -186,10 +179,7 @@ ${photosHtml}
   <div class="sig-box"><strong>Firma del colaborador</strong><br>${delivery.colaborador}</div>
   <div class="sig-box"><strong>Nombre y firma del responsable de TI</strong></div>
 </div>
-
-<script>window.onload = function() { setTimeout(function() { window.print(); }, 500); };</script>
-</body>
-</html>`;
+</div>`;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────

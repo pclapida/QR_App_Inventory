@@ -102,8 +102,9 @@ router.post('/send-email', authenticateToken, async (req, res) => {
 
     const fromName = process.env.SMTP_FROM || 'IT COFICAB <ti@coficab.com>';
 
-    // Remove the data URL prefix (e.g. "data:application/pdf;base64,") to get raw base64
-    const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+    // Remove any data URI prefix (e.g. "data:application/pdf;filename=generated.pdf;base64,") to get raw base64
+    const base64Parts = pdfBase64.split('base64,');
+    const base64Data = base64Parts.length > 1 ? base64Parts[1] : pdfBase64;
 
     await transporter.sendMail({
       from: fromName,
