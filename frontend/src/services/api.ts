@@ -86,4 +86,29 @@ api.interceptors.response.use(
   }
 );
 
+export interface ResponsivaHistory {
+  id: string;
+  itemId: string;
+  item?: Item;
+  colaborador: string;
+  marcaModelo: string;
+  serie: string;
+  nombreEquipo: string;
+  accesoriosJson: string;
+  observaciones?: string;
+  photoUrlsJson?: string;
+  createdAt: string;
+}
+
+export const responsivasApi = {
+  getAll: async () => {
+    const res = await api.get('/responsivas');
+    return res.data as ResponsivaHistory[];
+  },
+  create: async (data: Partial<ResponsivaHistory>) => {
+    const res = await api.post('/responsivas', data);
+    return res.data as ResponsivaHistory;
+  }
+};
+
 export default api;

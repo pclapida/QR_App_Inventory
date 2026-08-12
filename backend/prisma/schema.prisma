@@ -46,6 +46,7 @@ model Item {
   updatedAt          DateTime      @updatedAt
   transactions       Transaction[]
   maintenances       Maintenance[]
+  responsivas        ResponsivaHistory[]
 }
 
 model Transaction {
@@ -89,4 +90,18 @@ model PurchaseOrder {
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model ResponsivaHistory {
+  id             String   @id @default(uuid())
+  itemId         String
+  item           Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  colaborador    String
+  marcaModelo    String
+  serie          String
+  nombreEquipo   String
+  accesoriosJson String
+  observaciones  String?
+  photoUrlsJson  String?
+  createdAt      DateTime @default(now())
 }

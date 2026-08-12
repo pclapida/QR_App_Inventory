@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Camera, FileText, CheckCircle2, Printer, ChevronLeft, Eye } from 'lucide-react';
-import { Item } from '../services/api';
+import { Item, responsivasApi } from '../services/api';
 
 interface ResponsivaModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ async function blobUrlToBase64(url: string): Promise<string> {
 }
 
 // Builds and opens a print-ready HTML page in a new window
-async function openPrintWindow(item: Item, data: ResponsivaData) {
+export async function openPrintWindow(item: Item, data: ResponsivaData) {
   const today = new Date();
   const dateStr = `${today.getDate().toString().padStart(2, '0')} / ${(today.getMonth() + 1).toString().padStart(2, '0')} / ${today.getFullYear()}`;
 
@@ -95,7 +95,10 @@ async function openPrintWindow(item: Item, data: ResponsivaData) {
 <body>
 
 <div class="header">
-  <div><strong style="font-size:14pt;letter-spacing:1px;">COFICAB</strong><br><span style="font-size:9pt;color:#666;">Departamento de Tecnologías de la Información</span></div>
+  <div>
+    <img src="${window.location.origin}/coficab-logo.png" alt="COFICAB" style="max-height: 40px; margin-bottom: 5px;" onerror="this.outerHTML='<strong style=\\'font-size:14pt;letter-spacing:1px;\\'>COFICAB</strong>'" />
+    <br><span style="font-size:9pt;color:#666;">Departamento de Tecnologías de la Información</span>
+  </div>
   <div style="text-align:right;font-size:10pt;color:#555;">Fecha de Emisión: ${dateStr}<br>SKU: ${item.sku}</div>
 </div>
 
@@ -247,6 +250,21 @@ const DocumentPreview: React.FC<{
   const handlePrint = async () => {
     setPrinting(true);
     try {
+      // Guardar en el historial (si item existe y es nuevo o no lo guardamos todavia)
+      // Lo guardamos siempre que generamos una nueva impresión desde el formulario
+      await responsivasApi.create({
+        itemId: item.id,
+        colaborador: data.colaborador,
+        marcaModelo: data.marcaModelo,
+        serie: data.serie,
+        nombreEquipo: data.nombreEquipo,
+        accesoriosJson: JSON.stringify(data.accesorios),
+        observaciones: data.estado,
+        photoUrlsJson: JSON.stringify(data.photoUrls),
+      }).catch(err => {
+        console.error("No se pudo guardar el historial de la responsiva", err);
+      });
+
       await openPrintWindow(item, data);
     } finally {
       setPrinting(false);

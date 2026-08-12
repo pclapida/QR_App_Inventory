@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api, { Item } from '../services/api';
 import { QRModal } from '../components/QRModal';
 import { ResponsivaModal } from '../components/ResponsivaModal';
+import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
   Search,
@@ -75,6 +76,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
   // Accordion state
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Batch Print state
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -523,7 +527,15 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               const catItems = groupedItems[cat];
               const isExpanded = expandedCategories[cat];
               const isConsumable = cat === 'Consumibles' || cat === 'Herramientas';
-              const availableStock = isConsumable ? 0 : catItems.filter(i => i.stock > 0 && !i.assignedTo && !i.area).length;
+              const availableStock = isConsumable ? 0 : catItems.filter(i => {
+                if (i.stock <= 0) return false;
+                const assigned = i.assignedTo?.toLowerCase().trim() || '';
+                // Considerarlo disponible en el almacén de IT si no está asignado o está asignado genéricamente a IT
+                if (assigned && !['it', 'taller interno it', 'sistemas', 'taller it'].includes(assigned)) {
+                  return false;
+                }
+                return true;
+              }).length;
               const targetMin = CATEGORY_MIN_STOCK[cat] || 2;
               const isLow = !isConsumable && (availableStock < targetMin);
               const consumablesLow = isConsumable ? catItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)).length : 0;
@@ -614,6 +626,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                           <thead>
                             <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', background: 'var(--bg-card)' }}>
+                              <th style={{ padding: '0.75rem 1rem', width: '40px' }}></th>
                               <th style={{ padding: '0.75rem 1rem' }}>Equipo / Modelo</th>
                               <th style={{ padding: '0.75rem 1rem' }}>Planta</th>
                               <th style={{ padding: '0.75rem 1rem' }}>N° Serie & IP</th>
@@ -626,9 +639,22 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                           </thead>
                           <tbody>
                             {catItems.map((item) => {
-                              const isLowStock = (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock);
+                              const isLowStock = isConsumable ? ((item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)) : false;
                               return (
                                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                  <td style={{ padding: '0.85rem 1rem' }}>
+                                    <input 
+                                      type="checkbox"
+                                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                      checked={selectedItemIds.has(item.id)}
+                                      onChange={(e) => {
+                                        const newSet = new Set(selectedItemIds);
+                                        if (e.target.checked) newSet.add(item.id);
+                                        else newSet.delete(item.id);
+                                        setSelectedItemIds(newSet);
+                                      }}
+                                    />
+                                  </td>
                                   <td style={{ padding: '0.85rem 1rem' }}>
                                     <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{item.name}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--coficab-blue-bright)', fontFamily: 'monospace' }}>
@@ -1202,7 +1228,6 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
       {selectedQRItem && (
         <QRModal
-          isOpen={!!selectedQRItem}
           onClose={() => setSelectedQRItem(null)}
           item={selectedQRItem}
         />
@@ -1213,6 +1238,47 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         onClose={() => setResponsivaItem(null)}
         item={responsivaItem}
       />
+
+      {selectedItemIds.size > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '2rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--bg-card)',
+          padding: '1rem 1.5rem',
+          borderRadius: 'var(--radius-full)',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.5rem',
+          zIndex: 100,
+          border: '1px solid var(--border-color)'
+        }}>
+          <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>
+            {selectedItemIds.size} equipos seleccionados
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="btn btn-primary"
+              onClick={() => {
+                const itemsToPrint = items.filter(i => selectedItemIds.has(i.id));
+                printQRLabels(itemsToPrint);
+                setSelectedItemIds(new Set());
+              }}
+            >
+              <Printer size={18} />
+              Imprimir Lote QR
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => setSelectedItemIds(new Set())}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

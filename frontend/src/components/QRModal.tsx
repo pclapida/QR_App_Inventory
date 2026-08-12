@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Download, Printer, X, CheckCircle, Package } from 'lucide-react';
 import { Item } from '../services/api';
+import { printQRLabels } from '../utils/printLabels';
 
 interface QRModalProps {
   item: Item;
@@ -40,7 +41,7 @@ export const QRModal: React.FC<QRModalProps> = ({ item, onClose }) => {
   };
 
   const handlePrint = () => {
-    window.print();
+    printQRLabels([item]);
   };
 
   return (

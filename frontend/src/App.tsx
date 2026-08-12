@@ -12,6 +12,7 @@ import { PurchaseOrders } from './pages/PurchaseOrders';
 import { TVDashboard } from './pages/TVDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PrintResponsiva } from './pages/PrintResponsiva';
+import { ResponsivasHistory } from './pages/ResponsivasHistory';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requireAdmin?: boolean }> = ({ children, requireAdmin }) => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -109,6 +110,15 @@ const AppRoutes: React.FC = () => {
             element={
               <ProtectedRoute>
                 <PrintResponsiva />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/responsivas-history"
+            element={
+              <ProtectedRoute>
+                <ResponsivasHistory />
               </ProtectedRoute>
             }
           />
