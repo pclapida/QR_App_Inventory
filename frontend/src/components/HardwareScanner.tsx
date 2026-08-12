@@ -14,6 +14,11 @@ export const HardwareScanner: React.FC<HardwareScannerProps> = ({ onScan, loadin
   // Maintain persistent autoFocus (RNF-04)
   useEffect(() => {
     const focusInput = () => {
+      // No robar foco si el usuario está escribiendo en otro input (ej. en un modal)
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active !== inputRef.current) {
+        return;
+      }
       if (inputRef.current) {
         inputRef.current.focus();
       }
