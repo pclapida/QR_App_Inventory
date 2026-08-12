@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Printer, Calendar, User, Search, RefreshCw, Cpu } from 'lucide-react';
+import { FileText, Printer, Calendar, User, Search, RefreshCw, Cpu, Mail, CheckCircle2, Clock } from 'lucide-react';
 import { responsivasApi, ResponsivaHistory } from '../services/api';
 import { openPrintWindow } from '../components/ResponsivaModal';
 
@@ -91,8 +91,10 @@ export const ResponsivasHistory: React.FC = () => {
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Fecha</th>
                 <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Colaborador</th>
+                <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Correo</th>
                 <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Equipo</th>
                 <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Serie</th>
+                <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>Email</th>
                 <th style={{ padding: '1rem', fontWeight: 600, textAlign: 'right', color: 'var(--text-muted)' }}>Acciones</th>
               </tr>
             </thead>
@@ -112,6 +114,16 @@ export const ResponsivasHistory: React.FC = () => {
                     </div>
                   </td>
                   <td style={{ padding: '1rem' }}>
+                    {record.email ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#9ca3af' }}>
+                        <Mail size={13} />
+                        {record.email}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#4b5563', fontSize: '0.8rem', fontStyle: 'italic' }}>Sin correo</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Cpu size={14} color="var(--primary)" />
                       {record.nombreEquipo}
@@ -120,6 +132,17 @@ export const ResponsivasHistory: React.FC = () => {
                   </td>
                   <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                     {record.serie}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    {record.emailSent ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '0.2rem 0.6rem', borderRadius: '999px', border: '1px solid rgba(16,185,129,0.3)' }}>
+                        <CheckCircle2 size={12} /> Enviado
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', fontWeight: 600, color: '#6b7280', background: 'rgba(107,114,128,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px', border: '1px solid rgba(107,114,128,0.25)' }}>
+                        <Clock size={12} /> Pendiente
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <button onClick={() => handleReprint(record)} className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>

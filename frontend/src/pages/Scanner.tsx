@@ -6,6 +6,7 @@ import { HardwareScanner } from '../components/HardwareScanner';
 import { QRCameraScanner } from '../components/QRCameraScanner';
 import { QRModal } from '../components/QRModal';
 import { ResponsivaModal } from '../components/ResponsivaModal';
+import { DeliveryModal } from '../components/DeliveryModal';
 import {
   Scan,
   Camera,
@@ -84,6 +85,7 @@ export const Scanner: React.FC = () => {
 
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
   const [showResponsivaModal, setShowResponsivaModal] = useState<boolean>(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState<boolean>(false);
 
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
   const [targetPlant, setTargetPlant] = useState<string>('Planta 3');
@@ -579,14 +581,17 @@ export const Scanner: React.FC = () => {
                 Ver QR
               </button>
 
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowResponsivaModal(true)}
-                style={{ fontSize: '0.85rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-              >
-                <FileText size={16} />
-                Responsiva
-              </button>
+              {/* Entregar Equipo — solo para equipos de IT */}
+              {scannedItem.isITInternal && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowDeliveryModal(true)}
+                  style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <FileText size={16} />
+                  Entregar Equipo
+                </button>
+              )}
 
               <button className="btn btn-danger" onClick={handleDeleteScannedItem} style={{ fontSize: '0.85rem' }}>
                 <Trash2 size={16} />
@@ -1086,6 +1091,14 @@ export const Scanner: React.FC = () => {
         <ResponsivaModal
           isOpen={showResponsivaModal}
           onClose={() => setShowResponsivaModal(false)}
+          item={scannedItem}
+        />
+      )}
+
+      {showDeliveryModal && scannedItem && (
+        <DeliveryModal
+          isOpen={showDeliveryModal}
+          onClose={() => setShowDeliveryModal(false)}
           item={scannedItem}
         />
       )}

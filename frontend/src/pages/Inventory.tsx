@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { Item } from '../services/api';
 import { QRModal } from '../components/QRModal';
-import { ResponsivaModal } from '../components/ResponsivaModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -70,9 +69,6 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
   // Selected item for QR Modal
   const [selectedQRItem, setSelectedQRItem] = useState<Item | null>(null);
-
-  // Responsiva Modal State
-  const [responsivaItem, setResponsivaItem] = useState<Item | null>(null);
 
   // Accordion state
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -742,17 +738,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                         <QrCode size={14} />
                                         Etiqueta QR
                                       </button>
-                                      {item.isITInternal && (
-                                        <button
-                                          className="btn btn-secondary"
-                                          onClick={() => setResponsivaItem(item)}
-                                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', width: '100%', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-                                          title="Generar documento de asignación (Responsiva)"
-                                        >
-                                          <FileText size={14} />
-                                          Responsiva
-                                        </button>
-                                      )}
+
                                     </div>
                                   </td>
                                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
@@ -1233,11 +1219,6 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         />
       )}
 
-      <ResponsivaModal
-        isOpen={!!responsivaItem}
-        onClose={() => setResponsivaItem(null)}
-        item={responsivaItem}
-      />
 
       {selectedItemIds.size > 0 && (
         <div style={{

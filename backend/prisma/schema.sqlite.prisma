@@ -103,5 +103,7 @@ model ResponsivaHistory {
   accesoriosJson String
   observaciones  String?
   photoUrlsJson  String?
+  email          String?
+  emailSent      Boolean  @default(false)
   createdAt      DateTime @default(now())
 }

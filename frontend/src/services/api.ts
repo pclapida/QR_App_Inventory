@@ -97,6 +97,8 @@ export interface ResponsivaHistory {
   accesoriosJson: string;
   observaciones?: string;
   photoUrlsJson?: string;
+  email?: string;
+  emailSent?: boolean;
   createdAt: string;
 }
 
@@ -105,9 +107,13 @@ export const responsivasApi = {
     const res = await api.get('/responsivas');
     return res.data as ResponsivaHistory[];
   },
-  create: async (data: Partial<ResponsivaHistory>) => {
+  create: async (data: Partial<ResponsivaHistory> & { accesoriosJson?: string; photoUrlsJson?: string }) => {
     const res = await api.post('/responsivas', data);
     return res.data as ResponsivaHistory;
+  },
+  sendEmail: async (payload: { responsivaId: string | null; htmlContent: string; toEmail: string; colaborador: string; nombreEquipo: string }) => {
+    const res = await api.post('/responsivas/send-email', payload);
+    return res.data as { success: boolean; message: string };
   }
 };
 
