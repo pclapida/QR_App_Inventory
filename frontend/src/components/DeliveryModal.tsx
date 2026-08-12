@@ -103,7 +103,7 @@ async function buildResponsivaHTML(
 <div class="header">
   <div>
     <img src="${window.location.origin}/coficab-logo.png" alt="COFICAB" style="max-height: 40px; margin-bottom: 5px;" onerror="this.outerHTML='<strong style=\\'font-size:14pt;letter-spacing:1px;\\'>COFICAB</strong>'" />
-    <br><span style="font-size:9pt;color:#666;">Departamento de Tecnologías de la Información</span>
+    <br><span style="font-size:9pt;color:#666;">Departamento de IT</span>
   </div>
   <div style="text-align:right;font-size:10pt;color:#555;">Fecha de Emisión: ${dateStr}<br>SKU: ${item.sku}</div>
 </div>
@@ -143,6 +143,7 @@ async function buildResponsivaHTML(
 
 <hr style="margin:24px 0;border-color:#ccc;" />
 
+<div style="page-break-inside: avoid;">
 <h1 style="font-size:12pt;margin-bottom:14px;">DATOS DE ENTREGA</h1>
 
 <table class="data-table">
@@ -153,6 +154,7 @@ async function buildResponsivaHTML(
   <tr><td>Número de serie:</td><td>${responsiva.serie}</td></tr>
   <tr><td>Identificador (SKU) COFICAB:</td><td>${responsiva.nombreEquipo}</td></tr>
 </table>
+</div>
 
 <div class="section-title">Accesorios entregados</div>
 <div style="margin-bottom:16px;">

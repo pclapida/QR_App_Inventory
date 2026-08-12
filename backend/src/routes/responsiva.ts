@@ -112,7 +112,7 @@ router.post('/send-email', authenticateToken, async (req, res) => {
       subject: `Carta Responsiva - Entrega de Equipo: ${nombreEquipo || 'Equipo IT'}`,
       html: `
         <p>Estimado/a <strong>${colaborador || 'Colaborador'}</strong>,</p>
-        <p>Adjunto encontrará su <strong>Carta Responsiva</strong> de entrega de equipo IT por parte del departamento de Tecnología de COFICAB.</p>
+        <p>Adjunto encontrará su <strong>Carta Responsiva</strong> de entrega de equipo de computo por parte del departamento de IT de COFICAB.</p>
         <p>Por favor conserve este documento. Si tiene alguna pregunta, no dude en contactarnos.</p>
         <hr>
         <p style="font-size:12px;color:#999;">Este correo fue generado automáticamente por el sistema de inventario COFICAB IT.</p>
