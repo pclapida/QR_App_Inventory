@@ -1025,8 +1025,8 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               } catch { return null; }
             })()}
 
-            {/* Security Section */}
-            {(viewingItem.bitlockerKey || viewingItem.devicePassword) && (
+            {/* Security Section — always visible */}
+            {(true) && (
               <div style={{ background: detailSecurityUnlocked ? 'rgba(16,185,129,0.06)' : 'rgba(201,138,75,0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', border: detailSecurityUnlocked ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(201,138,75,0.4)', marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: detailSecurityUnlocked ? '1rem' : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: detailSecurityUnlocked ? '#10b981' : 'var(--coficab-copper)', fontSize: '0.9rem' }}>
@@ -1038,26 +1038,31 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                       const pass = prompt('Ingrese contraseña maestra para ver seguridad:');
                       if (pass === 'master123') setDetailSecurityUnlocked(true);
                       else if (pass) alert('Contraseña incorrecta');
-                    }}>Desbloquear</button>
+                    }}>🔓 Desbloquear</button>
                   ) : (
-                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setDetailSecurityUnlocked(false)}>Bloquear</button>
+                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setDetailSecurityUnlocked(false)}>🔒 Bloquear</button>
                   )}
                 </div>
                 {detailSecurityUnlocked && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                    {viewingItem.bitlockerKey && (
-                      <div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Clave BitLocker</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#10b981', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all' }}>{viewingItem.bitlockerKey}</div>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Clave BitLocker</div>
+                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: viewingItem.bitlockerKey ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: viewingItem.bitlockerKey ? 'normal' : 'italic' }}>
+                        {viewingItem.bitlockerKey || 'No configurado'}
                       </div>
-                    )}
-                    {viewingItem.devicePassword && (
-                      <div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Contraseña Dispositivo</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#10b981', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all' }}>{viewingItem.devicePassword}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Contraseña Dispositivo</div>
+                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: viewingItem.devicePassword ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: viewingItem.devicePassword ? 'normal' : 'italic' }}>
+                        {viewingItem.devicePassword || 'No configurado'}
                       </div>
-                    )}
+                    </div>
                   </div>
+                )}
+                {!detailSecurityUnlocked && (
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Clave BitLocker y contraseña del dispositivo protegidas. Presiona "Desbloquear" para verlas.
+                  </p>
                 )}
               </div>
             )}
