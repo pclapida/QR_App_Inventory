@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Clock, AlertTriangle, LogOut, RefreshCw } from 'lucide-react';
 
@@ -7,11 +8,15 @@ const WARNING_THRESHOLD_MS = 60 * 1000; // Show warning when 60s remain
 
 export const InactivityTimer: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
+  const location = useLocation();
   const [showWarning, setShowWarning] = useState<boolean>(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(60);
   
   const lastActivityRef = useRef<number>(Date.now());
   const timerCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Check if current route is TV Dashboard (unattended monitoring screen)
+  const isTVDashboard = location.pathname.startsWith('/tv-dashboard');
 
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -21,7 +26,11 @@ export const InactivityTimer: React.FC = () => {
   }, [showWarning]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // Disable timer if user is not authenticated OR currently watching the TV Dashboard
+    if (!isAuthenticated || isTVDashboard) {
+      setShowWarning(false);
+      return;
+    }
 
     // Listen for user interactions (clicks, keyboard, touch, mousemove, scans)
     const activityEvents = [
@@ -68,9 +77,9 @@ export const InactivityTimer: React.FC = () => {
         clearInterval(timerCheckIntervalRef.current);
       }
     };
-  }, [isAuthenticated, logout, resetTimer]);
+  }, [isAuthenticated, isTVDashboard, logout, resetTimer]);
 
-  if (!isAuthenticated || !showWarning) {
+  if (!isAuthenticated || isTVDashboard || !showWarning) {
     return null;
   }
 
