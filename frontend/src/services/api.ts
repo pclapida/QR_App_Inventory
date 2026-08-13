@@ -104,6 +104,27 @@ export interface ResponsivaHistory {
   createdAt: string;
 }
 
+export interface Requisition {
+  id: string;
+  reqNumber?: string;
+  requisitionFor?: string;
+  poNumber?: string;
+  supplier: string;
+  itemName: string;
+  category?: string;
+  quantity: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  status: 'PENDING' | 'APPROVED' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  receivedDate?: string;
+  receivedBy?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type PurchaseOrder = Requisition;
+
 export const responsivasApi = {
   getAll: async () => {
     const res = await api.get('/responsivas');

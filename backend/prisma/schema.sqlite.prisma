@@ -92,18 +92,26 @@ model Maintenance {
 }
 
 model PurchaseOrder {
-  id         String   @id @default(uuid())
-  poNumber   String   @unique
-  supplier   String
-  itemName   String
-  category   String?
-  quantity   Int
-  unitPrice  Float?
-  totalPrice Float?
-  status     String   @default("PENDING")
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String    @id @default(uuid())
+  reqNumber      String?
+  requisitionFor String?
+  poNumber       String?
+  supplier       String
+  itemName       String
+  category       String?
+  quantity       Int
+  unitPrice      Float?
+  totalPrice     Float?
+  status         String    @default("PENDING")
+  receivedDate   DateTime?
+  receivedBy     String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([reqNumber])
+  @@index([poNumber])
+  @@index([status])
 }
 
 model ResponsivaHistory {

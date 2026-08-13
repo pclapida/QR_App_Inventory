@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CoficabLogo } from './CoficabLogo';
-import { Package, PlusCircle, Scan, LogOut, User as UserIcon, Tv, Sun, Moon, Wrench, ShoppingCart, Laptop, Shield, FileText } from 'lucide-react';
+import { Package, PlusCircle, Scan, LogOut, User as UserIcon, Tv, Sun, Moon, Wrench, ShoppingCart, ClipboardList, Laptop, Shield, FileText } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -80,9 +80,10 @@ export const Navbar: React.FC = () => {
         <NavLink
           to="/purchase-orders"
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          title="Gestión de Requisiciones"
         >
-          <ShoppingCart size={18} />
-          Órdenes de Compra
+          <ClipboardList size={18} />
+          Gestión de Requisiciones
         </NavLink>
 
         <NavLink
