@@ -39,29 +39,34 @@ import {
 
 const MAINTENANCE_MATRIX: { [key: string]: { frequency: string; days: number; tasks: string[] } } = {
   Laptop: {
-    frequency: 'Cada mes (30 días)',
-    days: 30,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Windows', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico', 'Antivirus']
   },
   Tablet: {
-    frequency: 'Cada 15 días',
-    days: 15,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Play store', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico']
   },
   PC: {
-    frequency: 'Cada mes (30 días)',
-    days: 30,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Windows', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico', 'Antivirus']
   },
   Zebra: {
-    frequency: 'Semanalmente (7 días)',
-    days: 7,
+    frequency: 'Cada mes (30 días)',
+    days: 30,
     tasks: ['Limpieza', 'Rodillos', 'Cabezal', 'Hardware físico']
   },
   Impresoras: {
-    frequency: 'Semanalmente (7 días)',
-    days: 7,
+    frequency: 'Cada 3 meses',
+    days: 90,
     tasks: ['Limpieza', 'Rodillos', 'Bandeja de hojas', 'Toner', 'Hardware físico']
+  },
+  'Líneas de Producción': {
+    frequency: 'Cada 4 meses',
+    days: 120,
+    tasks: ['Limpieza', 'Hardware físico', 'Revisión de cableado', 'Pruebas de conexión']
   }
 };
 
@@ -222,8 +227,10 @@ export const Scanner: React.FC = () => {
     if (!scannedItem) return;
     let devType = 'Laptop';
     const lower = (scannedItem.name + ' ' + (scannedItem.category || '')).toLowerCase();
-    if (lower.includes('tablet')) devType = 'Tablet';
-    else if (lower.includes('pc') || lower.includes('minipc')) devType = 'PC';
+    if (lower.includes('laptop')) devType = 'Laptop';
+    else if (lower.includes('tablet')) devType = 'Tablet';
+    else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
+    else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';
     else if (lower.includes('zebra')) devType = 'Zebra';
     else if (lower.includes('impresora') || lower.includes('printer')) devType = 'Impresoras';
 
@@ -250,10 +257,12 @@ export const Scanner: React.FC = () => {
 
     let devType = 'Laptop';
     const lower = (scannedItem.name + ' ' + (scannedItem.category || '')).toLowerCase();
-    if (lower.includes('tablet')) devType = 'Tablet';
-    else if (lower.includes('pc') || lower.includes('minipc')) devType = 'PC';
+    if (lower.includes('laptop')) devType = 'Laptop';
+    else if (lower.includes('tablet')) devType = 'Tablet';
+    else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
+    else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';
     else if (lower.includes('zebra')) devType = 'Zebra';
-    else if (lower.includes('impresora')) devType = 'Impresoras';
+    else if (lower.includes('impresora') || lower.includes('printer')) devType = 'Impresoras';
 
     const config = MAINTENANCE_MATRIX[devType] || { days: 30 };
 

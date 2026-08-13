@@ -41,29 +41,34 @@ interface MaintenanceRecord {
 // Checklists matrix from COFICAB Excel
 const MAINTENANCE_MATRIX: { [key: string]: { frequency: string; days: number; tasks: string[] } } = {
   Laptop: {
-    frequency: 'Cada mes (30 días)',
-    days: 30,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Windows', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico', 'Antivirus']
   },
   Tablet: {
-    frequency: 'Cada 15 días',
-    days: 15,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Play store', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico']
   },
   PC: {
-    frequency: 'Cada mes (30 días)',
-    days: 30,
+    frequency: 'Cada 6 meses',
+    days: 180,
     tasks: ['Update Windows', 'Drivers', 'Check disk', 'Limpieza', 'Hardware físico', 'Antivirus']
   },
   Zebra: {
-    frequency: 'Semanalmente (7 días)',
-    days: 7,
+    frequency: 'Cada mes (30 días)',
+    days: 30,
     tasks: ['Limpieza', 'Rodillos', 'Cabezal', 'Hardware físico']
   },
   Impresoras: {
-    frequency: 'Semanalmente (7 días)',
-    days: 7,
+    frequency: 'Cada 3 meses',
+    days: 90,
     tasks: ['Limpieza', 'Rodillos', 'Bandeja de hojas', 'Toner', 'Hardware físico']
+  },
+  'Líneas de Producción': {
+    frequency: 'Cada 4 meses',
+    days: 120,
+    tasks: ['Limpieza', 'Hardware físico', 'Revisión de cableado', 'Pruebas de conexión']
   }
 };
 
@@ -112,6 +117,7 @@ export const Maintenance: React.FC = () => {
     const lowerName = (selectedItem.name + ' ' + (selectedItem.category || '')).toLowerCase();
     if (lowerName.includes('laptop')) setDeviceType('Laptop');
     else if (lowerName.includes('tablet')) setDeviceType('Tablet');
+    else if (lowerName.includes('línea') || lowerName.includes('linea') || lowerName.includes('producción') || lowerName.includes('produccion')) setDeviceType('Líneas de Producción');
     else if (lowerName.includes('pc') || lowerName.includes('minipc') || lowerName.includes('computadora')) setDeviceType('PC');
     else if (lowerName.includes('zebra')) setDeviceType('Zebra');
     else if (lowerName.includes('impresora') || lowerName.includes('printer')) setDeviceType('Impresoras');
@@ -234,11 +240,12 @@ export const Maintenance: React.FC = () => {
                 value={deviceType}
                 onChange={(e) => setDeviceType(e.target.value)}
               >
-                <option value="Laptop">Laptop (Frecuencia: Cada mes)</option>
-                <option value="Tablet">Tablet (Frecuencia: Cada 15 días)</option>
-                <option value="PC">PC / MiniPC (Frecuencia: Cada mes)</option>
-                <option value="Zebra">Zebra (Frecuencia: Semanalmente)</option>
-                <option value="Impresoras">Impresoras (Frecuencia: Semanalmente)</option>
+                <option value="Laptop">Laptop (Frecuencia: Cada 6 meses)</option>
+                <option value="Tablet">Tablet (Frecuencia: Cada 6 meses)</option>
+                <option value="PC">PC / MiniPC (Frecuencia: Cada 6 meses)</option>
+                <option value="Zebra">Zebra (Frecuencia: Cada mes)</option>
+                <option value="Impresoras">Impresoras (Frecuencia: Cada 3 meses)</option>
+                <option value="Líneas de Producción">Líneas de Producción (Frecuencia: Cada 4 meses)</option>
               </select>
             </div>
 
