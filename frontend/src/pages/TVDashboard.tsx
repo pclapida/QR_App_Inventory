@@ -181,14 +181,14 @@ export const TVDashboard: React.FC = () => {
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <h1 style={{
-                fontSize: '1.75rem',
+                fontSize: '1.65rem',
                 fontWeight: 900,
                 letterSpacing: '-0.02em',
-                background: 'linear-gradient(135deg, #ffffff 0%, #93c5fd 60%, #c98a4b 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
+                color: '#ffffff',
+                margin: 0,
+                lineHeight: 1.2
               }}>
                 MONITOR DE CONTROL EN VIVO
               </h1>
