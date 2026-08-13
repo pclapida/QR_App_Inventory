@@ -264,6 +264,14 @@ body {
   padding: 1.5rem 1rem 4rem 1rem;
 }
 
+.app-container-tv {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
 .app-header {
   display: flex;
   justify-content: space-between;

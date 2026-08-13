@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InactivityTimer } from './components/InactivityTimer';
 import { Navbar } from './components/Navbar';
@@ -52,10 +52,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requireAdmin?: boole
 };
 
 const AppRoutes: React.FC = () => {
+  const location = useLocation();
+  const isTV = location.pathname.startsWith('/tv-dashboard');
+
   return (
     <>
-      <Navbar />
-      <main className="app-container">
+      {!isTV && <Navbar />}
+      <main className={isTV ? "app-container-tv" : "app-container"}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/login" element={<Login />} />

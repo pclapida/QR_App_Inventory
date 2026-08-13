@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { Item, Transaction } from '../services/api';
 import { CoficabLogo } from '../components/CoficabLogo';
 import {
@@ -25,7 +26,8 @@ import {
   Printer,
   Headphones,
   Wifi,
-  Layers
+  Layers,
+  LogOut
 } from 'lucide-react';
 
 interface MaintenanceItem {
@@ -39,6 +41,7 @@ interface MaintenanceItem {
 }
 
 export const TVDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [upcomingMaintenances, setUpcomingMaintenances] = useState<MaintenanceItem[]>([]);
@@ -80,73 +83,57 @@ export const TVDashboard: React.FC = () => {
           id: m.id,
           name: m.item?.name || 'Equipo',
           sku: m.item?.sku || '',
-          area: m.item?.area || 'Planta',
-          category: m.deviceType || m.item?.category || '',
+          area: m.item?.area || m.item?.location || 'Planta',
+          category: m.item?.category || '',
           nextDueDate: m.nextDueDate,
           daysLeft
         };
       });
 
-      maintList.sort((a, b) => a.daysLeft - b.daysLeft);
-      setUpcomingMaintenances(maintList.slice(0, 6));
+      // Filter: only upcoming in next 60 days or overdue
+      const filteredMaint = maintList.filter((m) => m.daysLeft <= 60);
+      filteredMaint.sort((a, b) => a.daysLeft - b.daysLeft);
+      setUpcomingMaintenances(filteredMaint.slice(0, 6));
 
       setLastUpdated(new Date());
-
-      const outOfStockItems = fetchedItems.filter((i) => i.stock === 0);
-      if (soundEnabled && outOfStockItems.length > 0) {
-        playBeepSound();
-      }
-    } catch (err) {
-      console.error('Error al actualizar TV Dashboard:', err);
+    } catch (err: any) {
+      console.error('TV Dashboard fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const playBeepSound = () => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.3);
-    } catch (e) {
-      // AudioContext fallback
-    }
-  };
-
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 8000);
+    const interval = setInterval(fetchData, 15000); // 15s polling
     return () => clearInterval(interval);
-  }, [soundEnabled, dashboardMode]);
+  }, [dashboardMode]);
+
+  // Live Digital Clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      );
+    };
+    updateTime();
+    const clockInterval = setInterval(updateTime, 1000);
+    return () => clearInterval(clockInterval);
+  }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(console.error);
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(console.error);
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
   };
 
-  // Correct Metrics calculation:
-  // Out of stock = stock is 0
-  // Low stock = stock > 0 AND minStock > 0 AND stock <= minStock
   const outOfStockItems = items.filter((i) => i.stock === 0);
   const lowStockItems = items.filter((i) => i.stock > 0 && i.minStock > 0 && i.stock <= i.minStock);
   const healthyItemsCount = items.filter((i) => i.stock > 0 && (i.minStock === 0 || i.stock > i.minStock)).length;
@@ -164,13 +151,12 @@ export const TVDashboard: React.FC = () => {
 
   return (
     <div style={{
-      minHeight: 'calc(100vh - 120px)',
+      minHeight: '100vh',
+      width: '100%',
       background: '#060913',
-      borderRadius: 'var(--radius-lg)',
-      padding: '1.5rem',
+      padding: '1.25rem 2rem 3rem 2rem',
       color: '#ffffff',
-      border: '1px solid var(--border-highlight)',
-      boxShadow: '0 0 50px rgba(0,0,0,0.8)'
+      boxSizing: 'border-box'
     }}>
       {/* TV Header Bar */}
       <div style={{
@@ -184,7 +170,9 @@ export const TVDashboard: React.FC = () => {
         marginBottom: '1.5rem'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <CoficabLogo height={52} showTagline={true} themeMode="dark" />
+          <div style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')} title="Volver al Inventario">
+            <CoficabLogo height={52} showTagline={true} themeMode="dark" />
+          </div>
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -252,7 +240,7 @@ export const TVDashboard: React.FC = () => {
         </div>
 
         {/* Clock & Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
             background: 'rgba(15, 23, 42, 0.8)',
             border: '1px solid rgba(255,255,255,0.15)',
@@ -284,6 +272,16 @@ export const TVDashboard: React.FC = () => {
           >
             {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
             {isFullscreen ? 'Salir Pantalla Completa' : 'Modo TV Pantalla Completa'}
+          </button>
+
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate('/inventory')}
+            style={{ padding: '0.75rem 1.15rem', fontSize: '0.95rem' }}
+            title="Salir de TV y volver a inventario"
+          >
+            <LogOut size={18} />
+            Volver
           </button>
         </div>
       </div>
