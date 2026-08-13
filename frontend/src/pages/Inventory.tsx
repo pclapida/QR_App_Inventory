@@ -89,6 +89,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   // Edit Item Modal State with ALL registration fields
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editCustomFields, setEditCustomFields] = useState<{ key: string; value: string }[]>([]);
+  const [editSecurityUnlocked, setEditSecurityUnlocked] = useState<boolean>(false);
   const [editForm, setEditForm] = useState<any>({
     name: '',
     model: '',
@@ -108,6 +109,8 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     assignedTo: '',
     unit: 'unidad',
     location: '',
+    bitlockerKey: '',
+    devicePassword: '',
     description: ''
   });
   const [editLoading, setEditLoading] = useState<boolean>(false);
@@ -160,6 +163,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
   const handleOpenEdit = (item: Item) => {
     setEditingItem(item);
+    setEditSecurityUnlocked(false);
 
     let initialFields: { key: string; value: string }[] = [];
     if (item.customAttributes) {
@@ -193,7 +197,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       assignedTo: item.assignedTo || '',
       unit: item.unit || 'unidad',
       location: item.location || item.area || '',
-      description: item.description || ''
+      description: item.description || '',
+      bitlockerKey: item.bitlockerKey || '',
+      devicePassword: item.devicePassword || ''
     });
   };
 
@@ -1125,6 +1131,53 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                     placeholder="Observaciones de mantenimiento o notas generales..."
                   />
                 </div>
+
+                {/* Security Fields (Bitlocker, Password) for PCs and Laptops */}
+                {(editForm.category === 'Laptops' || editForm.category === 'Computadoras de Escritorio' || editForm.category === 'Equipos & Dispositivos') && (
+                  <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <label className="form-label" style={{ margin: 0, fontWeight: 800, color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span className="material-icons" style={{ fontSize: '18px' }}>lock</span> Datos de Seguridad (Solo Administrador)
+                      </label>
+                      {!editSecurityUnlocked ? (
+                        <button type="button" onClick={() => {
+                          const pass = prompt('Ingrese contraseña maestra para ver/editar seguridad:');
+                          if (pass === 'master123') setEditSecurityUnlocked(true);
+                          else if (pass) alert('Contraseña incorrecta');
+                        }} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
+                          Desbloquear
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Desbloqueado</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', opacity: editSecurityUnlocked ? 1 : 0.5, pointerEvents: editSecurityUnlocked ? 'auto' : 'none' }}>
+                      <div className="form-group">
+                        <label className="form-label">Clave de BitLocker</label>
+                        <input
+                          type={editSecurityUnlocked ? 'text' : 'password'}
+                          className="form-input"
+                          value={editForm.bitlockerKey}
+                          onChange={(e) => setEditForm({ ...editForm, bitlockerKey: e.target.value })}
+                          placeholder={editSecurityUnlocked ? "Ej. 123456-789012..." : "••••••••••••"}
+                          disabled={!editSecurityUnlocked}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Contraseña de Dispositivo</label>
+                        <input
+                          type={editSecurityUnlocked ? 'text' : 'password'}
+                          className="form-input"
+                          value={editForm.devicePassword}
+                          onChange={(e) => setEditForm({ ...editForm, devicePassword: e.target.value })}
+                          placeholder={editSecurityUnlocked ? "Ej. Admin.2026" : "••••••••••••"}
+                          disabled={!editSecurityUnlocked}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Dynamic Custom Fields Section */}
                 <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>

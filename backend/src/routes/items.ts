@@ -477,9 +477,10 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
       plant,
       location,
       description,
-      isITInternal,
       assignedTo,
-      customAttributes
+      customAttributes,
+      bitlockerKey,
+      devicePassword
     } = req.body;
 
     const existing = await prisma.item.findUnique({ where: { id } });
@@ -525,6 +526,8 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
         isITInternal: isITInternal !== undefined ? Boolean(isITInternal) : existing.isITInternal,
         assignedTo: assignedTo !== undefined ? (assignedTo ? assignedTo.trim() : null) : existing.assignedTo,
         customAttributes: customAttrStr,
+        bitlockerKey: bitlockerKey !== undefined ? (bitlockerKey ? bitlockerKey.trim() : null) : existing.bitlockerKey,
+        devicePassword: devicePassword !== undefined ? (devicePassword ? devicePassword.trim() : null) : existing.devicePassword,
         minStock: minStock !== undefined ? parseInt(minStock, 10) : existing.minStock,
         unit: unit !== undefined ? unit : existing.unit,
         location: location !== undefined ? location : existing.location,

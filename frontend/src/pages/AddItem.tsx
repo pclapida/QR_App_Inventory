@@ -40,6 +40,10 @@ export const AddItem: React.FC = () => {
   const [isITInternal, setIsITInternal] = useState<boolean>(() => searchParams.get('isIT') === '1');
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
 
+  const [bitlockerKey, setBitlockerKey] = useState<string>('');
+  const [devicePassword, setDevicePassword] = useState<string>('');
+  const [securityUnlocked, setSecurityUnlocked] = useState<boolean>(false);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [createdItem, setCreatedItem] = useState<Item | null>(null);
@@ -103,6 +107,8 @@ export const AddItem: React.FC = () => {
         plant,
         isITInternal,
         customAttributes: Object.keys(customAttributesObj).length > 0 ? customAttributesObj : null,
+        bitlockerKey: bitlockerKey.trim() || null,
+        devicePassword: devicePassword.trim() || null,
         unit,
         assignedTo: assignedTo.trim() || null,
         location: isITInternal ? 'Taller Interno IT' : (area || plant)
@@ -454,6 +460,53 @@ export const AddItem: React.FC = () => {
               placeholder="Notas generales del producto..."
             />
           </div>
+
+          {/* Security Fields (Bitlocker, Password) for PCs and Laptops */}
+          {(!isSimpleCategory && (category === 'Laptops' || category === 'Computadoras de Escritorio' || category === 'Equipos & Dispositivos')) && (
+            <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <label className="form-label" style={{ margin: 0, fontWeight: 800, color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span className="material-icons" style={{ fontSize: '18px' }}>lock</span> Datos de Seguridad (Solo Administrador)
+                </label>
+                {!securityUnlocked ? (
+                  <button type="button" onClick={() => {
+                    const pass = prompt('Ingrese contraseña maestra para editar seguridad:');
+                    if (pass === 'master123') setSecurityUnlocked(true);
+                    else if (pass) alert('Contraseña incorrecta');
+                  }} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
+                    Desbloquear
+                  </button>
+                ) : (
+                  <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Desbloqueado</span>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', opacity: securityUnlocked ? 1 : 0.5, pointerEvents: securityUnlocked ? 'auto' : 'none' }}>
+                <div className="form-group">
+                  <label className="form-label">Clave de BitLocker</label>
+                  <input
+                    type={securityUnlocked ? 'text' : 'password'}
+                    className="form-input"
+                    value={bitlockerKey}
+                    onChange={(e) => setBitlockerKey(e.target.value)}
+                    placeholder={securityUnlocked ? "Ej. 123456-789012..." : "••••••••••••"}
+                    disabled={!securityUnlocked}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contraseña de Dispositivo</label>
+                  <input
+                    type={securityUnlocked ? 'text' : 'password'}
+                    className="form-input"
+                    value={devicePassword}
+                    onChange={(e) => setDevicePassword(e.target.value)}
+                    placeholder={securityUnlocked ? "Ej. Admin.2026" : "••••••••••••"}
+                    disabled={!securityUnlocked}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Dynamic Custom Fields Section */}
           <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>

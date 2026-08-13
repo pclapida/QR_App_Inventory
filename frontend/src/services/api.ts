@@ -25,6 +25,8 @@ export interface Item {
   plant?: string;
   isITInternal?: boolean;
   assignedTo?: string;
+  bitlockerKey?: string;
+  devicePassword?: string;
   customAttributes?: string | Record<string, string>;
   stock: number;
   minStock: number;

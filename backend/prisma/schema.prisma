@@ -41,6 +41,8 @@ model Item {
   plant              String        @default("Planta 2")
   isITInternal       Boolean       @default(false)
   customAttributes   String?
+  bitlockerKey       String?
+  devicePassword     String?
   assignedTo         String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
