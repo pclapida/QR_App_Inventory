@@ -1,10 +1,19 @@
 import express, { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
+import rateLimit from 'express-rate-limit';
+import { prisma } from '../utils/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
-const prisma = new PrismaClient();
+
+// Rate limit: max 20 email dispatches per 15 minutes per IP
+const emailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Límite de envíos alcanzado. Por favor espere unos minutos antes de reenviar correos.' }
+});
 
 // ─── Nodemailer transporter ───────────────────────────────────────────────────
 const createTransporter = () => {
@@ -95,7 +104,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
 });
 
 // ─── POST /api/responsivas/send-email — Enviar responsiva por correo ─────────
-router.post('/send-email', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/send-email', authenticateToken, emailLimiter, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { responsivaId, pdfBase64, toEmail, colaborador, nombreEquipo } = req.body;
 

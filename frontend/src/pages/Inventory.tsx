@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { Item } from '../services/api';
 import { QRModal } from '../components/QRModal';
+import { ItemEditModal, ItemEditFormData } from '../components/inventory/ItemEditModal';
+import { ItemDetailModal } from '../components/inventory/ItemDetailModal';
+import { ExcelImportModal } from '../components/inventory/ExcelImportModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -90,42 +93,10 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
   };
 
-  // Excel Import Modal State
+  // Modular Modals State
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
-  const [importing, setImporting] = useState<boolean>(false);
-  const [importResult, setImportResult] = useState<{ message: string; count: number; errors: string[] } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Edit Item Modal State with ALL registration fields
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [editCustomFields, setEditCustomFields] = useState<{ key: string; value: string }[]>([]);
-  const [editSecurityUnlocked, setEditSecurityUnlocked] = useState<boolean>(false);
   const [viewingItem, setViewingItem] = useState<Item | null>(null);
-  const [detailSecurityUnlocked, setDetailSecurityUnlocked] = useState<boolean>(false);
-  const [editForm, setEditForm] = useState<any>({
-    name: '',
-    model: '',
-    serialNumber: '',
-    stock: 1,
-    minStock: 5,
-    area: '',
-    ipAddress: '',
-    hasWarranty: false,
-    warrantyExpiration: '',
-    faults: '',
-    notes: '',
-    sku: '',
-    category: 'Equipos & Dispositivos',
-    plant: 'Planta 2',
-    isITInternal: false,
-    assignedTo: '',
-    unit: 'unidad',
-    location: '',
-    bitlockerKey: '',
-    devicePassword: '',
-    description: ''
-  });
-  const [editLoading, setEditLoading] = useState<boolean>(false);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -173,104 +144,20 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     }
   };
 
-  const handleOpenEdit = (item: Item) => {
-    setEditingItem(item);
-    setEditSecurityUnlocked(false);
-
-    let initialFields: { key: string; value: string }[] = [];
-    if (item.customAttributes) {
-      try {
-        const parsed = typeof item.customAttributes === 'string' ? JSON.parse(item.customAttributes) : item.customAttributes;
-        if (parsed && typeof parsed === 'object') {
-          initialFields = Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }));
-        }
-      } catch (e) {
-        console.error('Error parsing customAttributes:', e);
+  const handleSaveItem = async (itemId: string, formData: ItemEditFormData, customFields: { key: string; value: string }[]) => {
+    const customAttributesObj: Record<string, string> = {};
+    customFields.forEach((f) => {
+      if (f.key.trim()) {
+        customAttributesObj[f.key.trim()] = f.value.trim();
       }
-    }
-    setEditCustomFields(initialFields);
-
-    setEditForm({
-      name: item.name || '',
-      model: item.model || '',
-      serialNumber: item.serialNumber || '',
-      stock: item.stock || 0,
-      minStock: item.minStock || 1,
-      area: item.area || item.location || '',
-      ipAddress: item.ipAddress || '',
-      hasWarranty: !!item.hasWarranty,
-      warrantyExpiration: item.warrantyExpiration || '',
-      faults: item.faults || '',
-      notes: item.notes || '',
-      sku: item.sku || '',
-      category: item.category || 'Equipos & Dispositivos',
-      plant: item.plant || 'Planta 2',
-      isITInternal: !!item.isITInternal,
-      assignedTo: item.assignedTo || '',
-      unit: item.unit || 'unidad',
-      location: item.location || item.area || '',
-      description: item.description || '',
-      bitlockerKey: item.bitlockerKey || '',
-      devicePassword: item.devicePassword || ''
     });
-  };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingItem) return;
-    setEditLoading(true);
-
-    try {
-      const customAttributesObj: Record<string, string> = {};
-      editCustomFields.forEach((f: { key: string; value: string }) => {
-        if (f.key.trim()) {
-          customAttributesObj[f.key.trim()] = f.value.trim();
-        }
-      });
-
-      await api.put(`/items/${editingItem.id}`, {
-        ...editForm,
-        customAttributes: Object.keys(customAttributesObj).length > 0 ? customAttributesObj : null,
-        location: editForm.isITInternal ? 'Taller Interno IT' : editForm.area
-      });
-      setEditingItem(null);
-      fetchItems();
-    } catch (err: any) {
-      console.error('Error al editar artículo:', err);
-      alert(err.response?.data?.error || 'Error al actualizar el artículo');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImporting(true);
-    setImportResult(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const res = await api.post('/items/import-excel', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      setImportResult({
-        message: res.data.message,
-        count: res.data.importedCount,
-        errors: res.data.errors || []
-      });
-      fetchItems();
-    } catch (err: any) {
-      console.error('Error al importar Excel:', err);
-      alert(err.response?.data?.error || 'Error al procesar la plantilla Excel');
-    } finally {
-      setImporting(false);
-      if (e.target) e.target.value = '';
-    }
+    await api.put(`/items/${itemId}`, {
+      ...formData,
+      customAttributes: Object.keys(customAttributesObj).length > 0 ? customAttributesObj : null,
+      location: formData.isITInternal ? 'Taller Interno IT' : formData.area
+    });
+    fetchItems();
   };
 
   const totalItemsCount = items.length;
@@ -763,7 +650,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
                                       <button
                                         className="btn btn-secondary"
-                                        onClick={() => { setViewingItem(item); setDetailSecurityUnlocked(false); }}
+                                        onClick={() => setViewingItem(item)}
                                         title="Ver detalles completos"
                                         style={{ padding: '0.35rem 0.55rem' }}
                                       >
@@ -773,7 +660,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                         <>
                                           <button
                                             className="btn btn-secondary"
-                                            onClick={() => handleOpenEdit(item)}
+                                            onClick={() => setEditingItem(item)}
                                             title="Editar todas las opciones del equipo"
                                             style={{ padding: '0.35rem 0.55rem' }}
                                           >
@@ -808,655 +695,32 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
       {/* Excel Import Modal */}
       {showImportModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '540px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <FileSpreadsheet size={24} style={{ color: 'var(--coficab-copper)' }} />
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                  Importar Inventario desde Excel
-                </h3>
-              </div>
-              <button onClick={() => setShowImportModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-              Seleccione un archivo de hoja de cálculo <strong>.xlsx, .xls o .csv</strong>. El sistema leerá e insertará automáticamente todos los equipos con sus nombres, modelos, números de serie, stock, área e IP, generando sus códigos QR.
-            </p>
-
-            <div style={{
-              background: 'var(--bg-input)',
-              border: '2px dashed var(--border-copper)',
-              borderRadius: 'var(--radius-md)',
-              padding: '2rem 1.5rem',
-              textAlign: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <input
-                type="file"
-                accept=".xlsx, .xls, .csv"
-                ref={fileInputRef}
-                onChange={handleExcelUpload}
-                style={{ display: 'none' }}
-              />
-
-              <Upload size={40} style={{ color: 'var(--coficab-copper)', margin: '0 auto 0.75rem auto' }} />
-
-              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
-                {importing ? 'Procesando e insertando filas de Excel...' : 'Cargar Archivo de Excel'}
-              </h4>
-
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                Soporta encabezados: Nombre, Modelo, Serie, Stock, Área, IP, Garantía, Fallas, Observaciones
-              </p>
-
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                style={{ background: 'linear-gradient(135deg, #d97706 0%, #b07238 100%)' }}
-              >
-                <FileSpreadsheet size={20} />
-                {importing ? 'Importando Datos...' : 'Seleccionar Archivo Excel (.xlsx)'}
-              </button>
-            </div>
-
-            {importResult && (
-              <div style={{
-                padding: '1rem',
-                background: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: 'var(--radius-md)',
-                color: '#10b981',
-                fontSize: '0.9rem',
-                marginBottom: '1.25rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-                  <CheckCircle2 size={20} /> {importResult.message}
-                </div>
-                {importResult.errors && importResult.errors.length > 0 && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#f43f5e' }}>
-                    <strong>Advertencias / Errores en filas:</strong>
-                    <ul>
-                      {importResult.errors.map((err, idx) => (
-                        <li key={idx}>{err}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setShowImportModal(false)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ExcelImportModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={fetchItems}
+        />
       )}
 
-      {/* ========== ITEM DETAIL MODAL ========== */}
+      {/* Item Detail Modal */}
       {viewingItem && (
-        <div className="modal-overlay" onClick={() => setViewingItem(null)}>
-          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
-                  <Package size={22} color="var(--primary)" />
-                  <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>{viewingItem.name}</h2>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--coficab-blue-bright)', background: 'rgba(37,99,235,0.1)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>SKU: {viewingItem.sku}</span>
-                  {viewingItem.category && <span className="badge" style={{ fontSize: '0.75rem' }}>{viewingItem.category}</span>}
-                  {viewingItem.isITInternal
-                    ? <span className="badge" style={{ background: 'rgba(201,138,75,0.25)', color: 'var(--coficab-copper)', border: '1px solid var(--coficab-copper)', fontSize: '0.75rem' }}>Interno IT</span>
-                    : <span className="badge" style={{ background: 'rgba(37,99,235,0.2)', color: '#60a5fa', border: '1px solid #3b82f6', fontSize: '0.75rem' }}>{viewingItem.plant || 'Planta 2'}</span>
-                  }
-                </div>
-              </div>
-              <button onClick={() => setViewingItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            {/* Info Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-              {/* Model */}
-              {viewingItem.model && (
-                <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Cpu size={12} /> Modelo</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{viewingItem.model}</div>
-                </div>
-              )}
-              {/* Serial */}
-              {viewingItem.serialNumber && (
-                <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Hash size={12} /> No. Serie</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>{viewingItem.serialNumber}</div>
-                </div>
-              )}
-              {/* Plant / Location */}
-              <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPinIcon size={12} /> Ubicación</div>
-                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{viewingItem.location || viewingItem.plant || '-'}</div>
-              </div>
-              {/* Area */}
-              {viewingItem.area && (
-                <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Tag size={12} /> Área</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{viewingItem.area}</div>
-                </div>
-              )}
-              {/* Assigned To */}
-              {viewingItem.assignedTo && (
-                <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><User size={12} /> Asignado a</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{viewingItem.assignedTo}</div>
-                </div>
-              )}
-              {/* IP */}
-              {viewingItem.ipAddress && (
-                <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Monitor size={12} /> IP</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace' }}>{viewingItem.ipAddress}</div>
-                </div>
-              )}
-              {/* Stock */}
-              <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Layers size={12} /> Stock</div>
-                <div style={{ fontWeight: 700, color: viewingItem.stock <= viewingItem.minStock ? '#f59e0b' : '#10b981', fontSize: '1.1rem' }}>{viewingItem.stock} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>{viewingItem.unit}</span></div>
-              </div>
-              {/* Warranty */}
-              <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Shield size={12} /> Garantía</div>
-                <div style={{ fontWeight: 700, color: viewingItem.hasWarranty ? '#10b981' : 'var(--text-muted)' }}>
-                  {viewingItem.hasWarranty ? `Vigente${viewingItem.warrantyExpiration ? ` — ${viewingItem.warrantyExpiration}` : ''}` : 'Sin garantía'}
-                </div>
-              </div>
-            </div>
-
-            {/* Notes / Faults / Description */}
-            {(viewingItem.notes || viewingItem.faults || viewingItem.description) && (
-              <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {viewingItem.description && (
-                  <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Descripción</div>
-                    <div style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.5 }}>{viewingItem.description}</div>
-                  </div>
-                )}
-                {viewingItem.notes && (
-                  <div style={{ background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Notas</div>
-                    <div style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.5 }}>{viewingItem.notes}</div>
-                  </div>
-                )}
-                {viewingItem.faults && (
-                  <div style={{ background: 'rgba(239,68,68,0.08)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Fallas / Defectos</div>
-                    <div style={{ color: '#f87171', fontSize: '0.9rem', lineHeight: 1.5 }}>{viewingItem.faults}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Custom Attributes */}
-            {viewingItem.customAttributes && (() => {
-              try {
-                const parsed = typeof viewingItem.customAttributes === 'string' ? JSON.parse(viewingItem.customAttributes) : viewingItem.customAttributes;
-                const entries = Object.entries(parsed as Record<string, string>);
-                if (entries.length === 0) return null;
-                return (
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Atributos adicionales</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
-                      {entries.map(([k, v]) => (
-                        <div key={k} style={{ background: 'var(--bg-input)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--coficab-copper)', fontWeight: 700, marginBottom: '0.15rem' }}>{k}</div>
-                          <div style={{ color: 'var(--text-main)', fontSize: '0.875rem', fontFamily: 'monospace' }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              } catch { return null; }
-            })()}
-
-            {/* Security Section — always visible */}
-            {(true) && (
-              <div style={{ background: detailSecurityUnlocked ? 'rgba(16,185,129,0.06)' : 'rgba(201,138,75,0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', border: detailSecurityUnlocked ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(201,138,75,0.4)', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: detailSecurityUnlocked ? '1rem' : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: detailSecurityUnlocked ? '#10b981' : 'var(--coficab-copper)', fontSize: '0.9rem' }}>
-                    {detailSecurityUnlocked ? <Unlock size={16} /> : <Lock size={16} />}
-                    Datos de Seguridad
-                  </div>
-                  {!detailSecurityUnlocked ? (
-                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={() => {
-                      const pass = prompt('Ingrese contraseña maestra para ver seguridad:');
-                      if (pass === 'master123') setDetailSecurityUnlocked(true);
-                      else if (pass) alert('Contraseña incorrecta');
-                    }}>🔓 Desbloquear</button>
-                  ) : (
-                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={() => setDetailSecurityUnlocked(false)}>🔒 Bloquear</button>
-                  )}
-                </div>
-                {detailSecurityUnlocked && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Clave BitLocker</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: viewingItem.bitlockerKey ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: viewingItem.bitlockerKey ? 'normal' : 'italic' }}>
-                        {viewingItem.bitlockerKey || 'No configurado'}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Contraseña Dispositivo</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: 700, color: viewingItem.devicePassword ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: viewingItem.devicePassword ? 'normal' : 'italic' }}>
-                        {viewingItem.devicePassword || 'No configurado'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!detailSecurityUnlocked && (
-                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Clave BitLocker y contraseña del dispositivo protegidas. Presiona "Desbloquear" para verlas.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Footer actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-              {isAdmin && (
-                <button className="btn btn-secondary" onClick={() => { setViewingItem(null); handleOpenEdit(viewingItem); }}>
-                  <Edit size={15} /> Editar
-                </button>
-              )}
-              <button className="btn btn-primary" onClick={() => setViewingItem(null)}>Cerrar</button>
-            </div>
-          </div>
-        </div>
+        <ItemDetailModal
+          item={viewingItem}
+          isAdmin={isAdmin}
+          onClose={() => setViewingItem(null)}
+          onEdit={(item) => {
+            setViewingItem(null);
+            setEditingItem(item);
+          }}
+        />
       )}
 
-      {/* Edit Item Modal */}
+      {/* Item Edit Modal */}
       {editingItem && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '650px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                  Editar Equipo / Artículo: {editingItem.sku}
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                  Modifique cualquiera de las opciones y atributos guardados.
-                </p>
-              </div>
-              <button onClick={() => setEditingItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.2rem' }}>
-
-                {/* 1. Nombre */}
-                <div className="form-group">
-                  <label className="form-label">1. Nombre del Equipo / Artículo *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {/* 2. Modelo */}
-                <div className="form-group">
-                  <label className="form-label">
-                    2. Modelo {editingItem?.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.model}
-                    onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
-                    required={editingItem?.isITInternal}
-                    style={editingItem?.isITInternal && !editForm.model ? { borderColor: 'rgba(239,68,68,0.5)' } : undefined}
-                  />
-                </div>
-
-                {/* 3. Número de Serie */}
-                <div className="form-group">
-                  <label className="form-label">
-                    3. Número de Serie {editingItem?.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.serialNumber}
-                    onChange={(e) => setEditForm({ ...editForm, serialNumber: e.target.value })}
-                    required={editingItem?.isITInternal}
-                    style={editingItem?.isITInternal && !editForm.serialNumber ? { borderColor: 'rgba(239,68,68,0.5)' } : undefined}
-                  />
-                </div>
-
-                {/* 4. Stock */}
-                <div className="form-group">
-                  <label className="form-label">4. Stock (Cantidad)</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={editForm.stock}
-                    onChange={(e) => setEditForm({ ...editForm, stock: parseInt(e.target.value || '0', 10) })}
-                    min="0"
-                    required
-                  />
-                </div>
-
-                {/* 5. Área */}
-                <div className="form-group">
-                  <label className="form-label">5. Área / Ubicación</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.area}
-                    onChange={(e) => setEditForm({ ...editForm, area: e.target.value })}
-                  />
-                </div>
-
-                {/* 6. Dirección IP */}
-                <div className="form-group">
-                  <label className="form-label">6. Dirección IP</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.ipAddress}
-                    onChange={(e) => setEditForm({ ...editForm, ipAddress: e.target.value })}
-                  />
-                </div>
-
-                {/* Garantía */}
-                <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <label className="form-label" style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800 }}>
-                    <ShieldCheck size={18} /> ¿Cuenta con Garantía Vigente?
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', color: 'var(--text-main)' }}>
-                      <input
-                        type="radio"
-                        name="editHasWarranty"
-                        checked={editForm.hasWarranty}
-                        onChange={() => setEditForm({ ...editForm, hasWarranty: true })}
-                      />
-                      Sí (Con Garantía)
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                      <input
-                        type="radio"
-                        name="editHasWarranty"
-                        checked={!editForm.hasWarranty}
-                        onChange={() => setEditForm({ ...editForm, hasWarranty: false, warrantyExpiration: '' })}
-                      />
-                      No / Vencida
-                    </label>
-                  </div>
-
-                  {editForm.hasWarranty && (
-                    <div style={{ marginTop: '0.75rem' }}>
-                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Fecha de Vencimiento de la Garantía</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={editForm.warrantyExpiration}
-                        onChange={(e) => setEditForm({ ...editForm, warrantyExpiration: e.target.value })}
-                        placeholder="ej. 29/06/2026 o 18/12/2026"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* 7. SKU / Código Interno */}
-                <div className="form-group">
-                  <label className="form-label">7. SKU / Código Interno</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.sku}
-                    onChange={(e) => setEditForm({ ...editForm, sku: e.target.value.toUpperCase() })}
-                    required
-                  />
-                </div>
-
-                {/* Categoría */}
-                <div className="form-group">
-                  <label className="form-label">Categoría</label>
-                  <select
-                    className="form-input"
-                    value={editForm.category}
-                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                  >
-                    <option value="Equipos & Dispositivos">Equipos & Dispositivos</option>
-                    <option value="Hardware & Lectores">Hardware & Lectores</option>
-                    <option value="Consumibles">Consumibles</option>
-                    <option value="Maquinaria">Maquinaria</option>
-                    <option value="Herramientas">Herramientas</option>
-                  </select>
-                </div>
-
-                {/* Planta COFICAB */}
-                <div className="form-group">
-                  <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 800 }}>Planta COFICAB</label>
-                  <select
-                    className="form-input"
-                    value={editForm.plant}
-                    onChange={(e) => setEditForm({ ...editForm, plant: e.target.value })}
-                    style={{ fontWeight: 700, borderColor: 'var(--primary)' }}
-                  >
-                    <option value="Planta 1">Planta 1</option>
-                    <option value="Planta 2">Planta 2 (Principal)</option>
-                    <option value="Planta 3">Planta 3</option>
-                    <option value="Planta UPCAST">Planta UPCAST</option>
-                  </select>
-                </div>
-
-                {/* Stock Mínimo */}
-                <div className="form-group">
-                  <label className="form-label">Stock Mínimo (Alerta)</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={editForm.minStock}
-                    onChange={(e) => setEditForm({ ...editForm, minStock: parseInt(e.target.value || '0', 10) })}
-                    min="0"
-                    required
-                  />
-                </div>
-
-                {/* Unidad de Medida */}
-                <div className="form-group">
-                  <label className="form-label">Unidad de Medida</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editForm.unit}
-                    onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {/* 8. Fallas */}
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label" style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <AlertTriangle size={15} /> 8. Fallas / Defectos Reportados
-                  </label>
-                  <textarea
-                    className="form-input"
-                    rows={2}
-                    value={editForm.faults}
-                    onChange={(e) => setEditForm({ ...editForm, faults: e.target.value })}
-                    placeholder="Describa fallas o problemas si aplica..."
-                  />
-                </div>
-
-                {/* Asignado a */}
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Responsable / Asignado a</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Nombre de la persona (ej. Juan Perez)"
-                    value={editForm.assignedTo}
-                    onChange={(e) => setEditForm({ ...editForm, assignedTo: e.target.value })}
-                  />
-                </div>
-
-                {/* 9. Observaciones */}
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">9. Observaciones / Notas Adicionales</label>
-                  <textarea
-                    className="form-input"
-                    rows={2}
-                    value={editForm.notes}
-                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                    placeholder="Observaciones de mantenimiento o notas generales..."
-                  />
-                </div>
-
-                {/* Security Fields (Bitlocker, Password) for PCs and Laptops */}
-                {(editForm.category === 'Laptops' || editForm.category === 'Computadoras de Escritorio' || editForm.category === 'Equipos & Dispositivos') && (
-                  <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <label className="form-label" style={{ margin: 0, fontWeight: 800, color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span className="material-icons" style={{ fontSize: '18px' }}>lock</span> Datos de Seguridad (Solo Administrador)
-                      </label>
-                      {!editSecurityUnlocked ? (
-                        <button type="button" onClick={() => {
-                          const pass = prompt('Ingrese contraseña maestra para ver/editar seguridad:');
-                          if (pass === 'master123') setEditSecurityUnlocked(true);
-                          else if (pass) alert('Contraseña incorrecta');
-                        }} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                          Desbloquear
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Desbloqueado</span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', opacity: editSecurityUnlocked ? 1 : 0.5, pointerEvents: editSecurityUnlocked ? 'auto' : 'none' }}>
-                      <div className="form-group">
-                        <label className="form-label">Clave de BitLocker</label>
-                        <input
-                          type={editSecurityUnlocked ? 'text' : 'password'}
-                          className="form-input"
-                          value={editForm.bitlockerKey}
-                          onChange={(e) => setEditForm({ ...editForm, bitlockerKey: e.target.value })}
-                          placeholder={editSecurityUnlocked ? "Ej. 123456-789012..." : "••••••••••••"}
-                          disabled={!editSecurityUnlocked}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Contraseña de Dispositivo</label>
-                        <input
-                          type={editSecurityUnlocked ? 'text' : 'password'}
-                          className="form-input"
-                          value={editForm.devicePassword}
-                          onChange={(e) => setEditForm({ ...editForm, devicePassword: e.target.value })}
-                          placeholder={editSecurityUnlocked ? "Ej. Admin.2026" : "••••••••••••"}
-                          disabled={!editSecurityUnlocked}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Dynamic Custom Fields Section */}
-                <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div>
-                      <label className="form-label" style={{ color: 'var(--coficab-copper)', fontWeight: 800, fontSize: '0.95rem', marginBottom: 0 }}>
-                        Campos y Atributos Personalizados Dinámicos
-                      </label>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                        Agregue o elimine libremente nuevos campos (ej. Clave Bitlocker, N° Factura, Proveedor, Voltaje, Licencia, MAC Address, etc.).
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setEditCustomFields([...editCustomFields, { key: '', value: '' }])}
-                      style={{ fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
-                    >
-                      <PlusCircle size={16} />
-                      Añadir Nuevo Campo
-                    </button>
-                  </div>
-
-                  {editCustomFields.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {editCustomFields.map((field: { key: string; value: string }, idx: number) => (
-                        <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Nombre del Campo (ej. Clave Bitlocker / Proveedor)"
-                            value={field.key}
-                            onChange={(e) => {
-                              const updated = [...editCustomFields];
-                              updated[idx].key = e.target.value;
-                              setEditCustomFields(updated);
-                            }}
-                            style={{ flex: 1, minWidth: '180px', fontWeight: 700 }}
-                          />
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Valor (ej. 81135362 / Dell México)"
-                            value={field.value}
-                            onChange={(e) => {
-                              const updated = [...editCustomFields];
-                              updated[idx].value = e.target.value;
-                              setEditCustomFields(updated);
-                            }}
-                            style={{ flex: 1, minWidth: '180px' }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-danger"
-                            onClick={() => setEditCustomFields(editCustomFields.filter((_: any, i: number) => i !== idx))}
-                            style={{ padding: '0.55rem', borderRadius: 'var(--radius-sm)' }}
-                            title="Eliminar este campo"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem', fontStyle: 'italic', background: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-                      No ha añadido ningún campo personalizado adicional. Presione "Añadir Nuevo Campo" para agregar un nuevo dato a este registro.
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditingItem(null)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary btn-lg" disabled={editLoading}>
-                  <Check size={18} />
-                  {editLoading ? 'Guardando...' : 'Guardar Todos los Cambios'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ItemEditModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSave={handleSaveItem}
+        />
       )}
 
       {selectedQRItem && (

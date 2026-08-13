@@ -69,50 +69,74 @@ router.put('/:id/status', requireAdmin, async (req: AuthenticatedRequest, res: R
       return res.status(400).json({ error: 'Estado de orden de compra inválido.' });
     }
 
-    const order = await prisma.purchaseOrder.findUnique({ where: { id } });
-    if (!order) {
-      return res.status(404).json({ error: 'Orden de compra no encontrada' });
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.purchaseOrder.findUnique({ where: { id } });
+      if (!order) {
+        throw new Error('NOT_FOUND: Orden de compra no encontrada');
+      }
 
-    const updatedOrder = await prisma.purchaseOrder.update({
-      where: { id },
-      data: { status }
-    });
-
-    // If marked as RECEIVED, auto-add or update stock in Inventory!
-    if (status === 'RECEIVED' && order.status !== 'RECEIVED') {
-      // Find matching item by name or create a new one
-      const existingItem = await prisma.item.findFirst({
-        where: { name: { contains: order.itemName } }
+      const updatedOrder = await tx.purchaseOrder.update({
+        where: { id },
+        data: { status }
       });
 
-      if (existingItem) {
-        await prisma.item.update({
-          where: { id: existingItem.id },
-          data: { stock: existingItem.stock + order.quantity }
+      // If newly marked as RECEIVED, atomically increase stock or create item + log transaction
+      if (status === 'RECEIVED' && order.status !== 'RECEIVED') {
+        const existingItem = await tx.item.findFirst({
+          where: { name: { equals: order.itemName } }
+        }) || await tx.item.findFirst({
+          where: { name: { contains: order.itemName } }
         });
-      } else {
-        const newItemId = uuidv4();
-        const sku = `PO-ITM-${Math.floor(1000 + Math.random() * 9000)}`;
-        await prisma.item.create({
-          data: {
-            id: newItemId,
-            sku,
-            name: order.itemName,
-            category: order.category || 'Equipos & Dispositivos',
-            stock: order.quantity,
-            minStock: 1,
-            unit: 'unidad',
-            location: 'Almacén Central',
-            qrCodePayload: `INV-${newItemId}`
-          }
-        });
-      }
-    }
 
-    return res.json({ order: updatedOrder });
+        let targetItemId: string;
+
+        if (existingItem) {
+          targetItemId = existingItem.id;
+          await tx.item.update({
+            where: { id: existingItem.id },
+            data: { stock: existingItem.stock + order.quantity }
+          });
+        } else {
+          targetItemId = uuidv4();
+          const sku = `PO-ITM-${Math.floor(1000 + Math.random() * 9000)}`;
+          await tx.item.create({
+            data: {
+              id: targetItemId,
+              sku,
+              name: order.itemName,
+              category: order.category || 'Equipos & Dispositivos',
+              stock: order.quantity,
+              minStock: 1,
+              unit: 'unidad',
+              location: 'Almacén Central',
+              qrCodePayload: `INV-${targetItemId}`
+            }
+          });
+        }
+
+        // Register transaction audit trail
+        if (req.user?.id) {
+          await tx.transaction.create({
+            data: {
+              itemId: targetItemId,
+              userId: req.user.id,
+              type: 'INBOUND',
+              quantity: order.quantity,
+              notes: `Ingreso automático por Orden de Compra ${order.poNumber} (${order.supplier})`
+            }
+          });
+        }
+      }
+
+      return updatedOrder;
+    });
+
+    return res.json({ order: result });
   } catch (error: any) {
     console.error('Error al actualizar estado de orden de compra:', error);
+    if (error.message && error.message.startsWith('NOT_FOUND:')) {
+      return res.status(404).json({ error: error.message.replace('NOT_FOUND: ', '') });
+    }
     return res.status(500).json({ error: 'Error al actualizar la orden de compra' });
   }
 });

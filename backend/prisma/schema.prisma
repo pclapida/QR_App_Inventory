@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -49,6 +49,11 @@ model Item {
   transactions       Transaction[]
   maintenances       Maintenance[]
   responsivas        ResponsivaHistory[]
+
+  @@index([plant, category])
+  @@index([isITInternal])
+  @@index([assignedTo])
+  @@index([serialNumber])
 }
 
 model Transaction {
@@ -64,6 +69,10 @@ model Transaction {
   toPlant    String?
   notes      String?
   createdAt  DateTime @default(now())
+
+  @@index([itemId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Maintenance {
@@ -77,6 +86,9 @@ model Maintenance {
   checklist   String
   notes       String?
   createdAt   DateTime @default(now())
+
+  @@index([itemId])
+  @@index([nextDueDate])
 }
 
 model PurchaseOrder {
@@ -108,4 +120,7 @@ model ResponsivaHistory {
   email          String?
   emailSent      Boolean  @default(false)
   createdAt      DateTime @default(now())
+
+  @@index([itemId])
+  @@index([createdAt])
 }

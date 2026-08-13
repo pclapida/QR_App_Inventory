@@ -1,35 +1,43 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InactivityTimer } from './components/InactivityTimer';
 import { Navbar } from './components/Navbar';
-import { Login } from './pages/Login';
-import { Inventory } from './pages/Inventory';
-import { Scanner } from './pages/Scanner';
-import { AddItem } from './pages/AddItem';
-import { Maintenance } from './pages/Maintenance';
-import { PurchaseOrders } from './pages/PurchaseOrders';
-import { TVDashboard } from './pages/TVDashboard';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { PrintResponsiva } from './pages/PrintResponsiva';
-import { ResponsivasHistory } from './pages/ResponsivasHistory';
+import { RefreshCw } from 'lucide-react';
+
+const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const Scanner = lazy(() => import('./pages/Scanner').then(m => ({ default: m.Scanner })));
+const AddItem = lazy(() => import('./pages/AddItem').then(m => ({ default: m.AddItem })));
+const Maintenance = lazy(() => import('./pages/Maintenance').then(m => ({ default: m.Maintenance })));
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
+const TVDashboard = lazy(() => import('./pages/TVDashboard').then(m => ({ default: m.TVDashboard })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const PrintResponsiva = lazy(() => import('./pages/PrintResponsiva').then(m => ({ default: m.PrintResponsiva })));
+const ResponsivasHistory = lazy(() => import('./pages/ResponsivasHistory').then(m => ({ default: m.ResponsivasHistory })));
+
+const PageLoader: React.FC = () => (
+  <div style={{
+    minHeight: '60vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.75rem',
+    color: 'var(--coficab-copper, #c98a4b)',
+    fontSize: '1rem',
+    fontWeight: 600
+  }}>
+    <RefreshCw size={32} className="spinning" style={{ animation: 'spin 1s linear infinite' }} />
+    <span>Cargando módulo...</span>
+  </div>
+);
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requireAdmin?: boolean }> = ({ children, requireAdmin }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#818cf8',
-        fontSize: '1.1rem'
-      }}>
-        Cargando aplicación...
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -48,7 +56,8 @@ const AppRoutes: React.FC = () => {
     <>
       <Navbar />
       <main className="app-container">
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           <Route path="/login" element={<Login />} />
           
           <Route
@@ -143,6 +152,7 @@ const AppRoutes: React.FC = () => {
 
           <Route path="*" element={<Navigate to="/inventory" replace />} />
         </Routes>
+        </Suspense>
       </main>
     </>
   );
