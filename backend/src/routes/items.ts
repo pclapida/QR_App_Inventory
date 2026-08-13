@@ -333,7 +333,9 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
       description,
       isITInternal,
       assignedTo,
-      customAttributes
+      customAttributes,
+      bitlockerKey,
+      devicePassword
     } = req.body;
 
     if (!name) {
@@ -375,6 +377,8 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
         isITInternal: isIT,
         assignedTo: assignedTo ? assignedTo.trim() : null,
         customAttributes: customAttrStr,
+        bitlockerKey: bitlockerKey ? bitlockerKey.trim() : null,
+        devicePassword: devicePassword ? devicePassword.trim() : null,
         stock: typeof stock === 'number' ? stock : parseInt(stock || '1', 10),
         minStock: typeof minStock === 'number' ? minStock : parseInt(minStock || '1', 10),
         unit: unit ? unit.trim() : 'unidad',
@@ -477,6 +481,7 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
       plant,
       location,
       description,
+      isITInternal,
       assignedTo,
       customAttributes,
       bitlockerKey,
