@@ -412,204 +412,205 @@ export const TVDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main TV Split View: 3 Panels (Urgent Stock, Live Movements, Maintenance Timers) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
-
-        {/* Panel 1: Urgent Stock Alerts */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
-              <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
-              ALERTAS DE REABASTECIMIENTO
-            </h2>
-          </div>
-
-          {outOfStockItems.length === 0 && lowStockItems.length === 0 ? (
-            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#10b981' }}>
-              <CheckCircle2 size={40} style={{ margin: '0 auto 0.5rem auto' }} />
-              <div style={{ fontSize: '1rem', fontWeight: 700 }}>¡Stock de Todos los Equipos en Nivel Óptimo!</div>
-              <p style={{ fontSize: '0.82rem', color: '#9ca3af', marginTop: '0.2rem' }}>Todos los 799 equipos están en servicio activo.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto' }}>
-              {outOfStockItems.map((item) => (
-                <div key={item.id} style={{
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '2px solid #ef4444',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '0.75rem 1rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div>
-                    <span className="badge badge-outbound" style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.68rem' }}>AGOTADO</span>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#d1d5db' }}>SKU: {item.sku} | Área: {item.location || 'Planta'}</div>
-                  </div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ef4444' }}>0</div>
-                </div>
-              ))}
-
-              {lowStockItems.map((item) => (
-                <div key={item.id} style={{
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px solid #f59e0b',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '0.75rem 1rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div>
-                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>STOCK BAJO</span>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginTop: '0.2rem' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#d1d5db' }}>SKU: {item.sku}</div>
-                  </div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f59e0b' }}>{item.stock}</div>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Horizontal TV Section 1: Urgent Stock Alerts */}
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.8)',
+        border: outOfStockItems.length > 0 || lowStockItems.length > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 'var(--radius-md)',
+        padding: '1.25rem',
+        marginBottom: '1.25rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
+            <AlertTriangle size={22} style={{ color: '#f59e0b' }} />
+            ALERTAS DE REABASTECIMIENTO
+            <span style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 400, marginLeft: '0.5rem' }}>
+              ({outOfStockItems.length + lowStockItems.length} {outOfStockItems.length + lowStockItems.length === 1 ? 'equipo requiere atención' : 'equipos requieren atención'})
+            </span>
+          </h2>
         </div>
 
-        {/* Panel 2: Maintenance Expiration Timers */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
-              <Wrench size={20} style={{ color: 'var(--coficab-copper)' }} />
-              TEMPORIZADORES DE MANTENIMIENTO
-            </h2>
-            <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Más Próximos a Vencer</span>
+        {outOfStockItems.length === 0 && lowStockItems.length === 0 ? (
+          <div style={{ padding: '1rem 1.5rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#10b981' }}>
+            <CheckCircle2 size={24} />
+            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>¡Stock de Todos los Equipos en Nivel Óptimo! Todos los equipos cuentan con inventario disponible.</div>
           </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '0.85rem' }}>
+            {outOfStockItems.map((item) => (
+              <div key={item.id} style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '2px solid #ef4444',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.85rem 1.15rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <span className="badge badge-outbound" style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>AGOTADO</span>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', marginTop: '0.25rem' }}>{item.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#d1d5db' }}>SKU: {item.sku} | Área: {item.location || item.area || 'Planta'}</div>
+                </div>
+                <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#ef4444', marginLeft: '1rem' }}>0</div>
+              </div>
+            ))}
 
-          {upcomingMaintenances.length === 0 ? (
-            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#9ca3af' }}>
-              <p style={{ fontSize: '0.9rem' }}>No hay temporizadores de mantenimiento registrados.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto' }}>
-              {upcomingMaintenances.map((m) => {
-                const isOverdue = m.daysLeft <= 0;
-                return (
-                  <div key={m.id} style={{
-                    background: isOverdue ? 'rgba(239, 68, 68, 0.16)' : 'rgba(245, 158, 11, 0.14)',
-                    border: isOverdue ? '1.5 solid #ef4444' : '1px solid rgba(245, 158, 11, 0.4)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '0.75rem 1rem',
+            {lowStockItems.map((item) => (
+              <div key={item.id} style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid #f59e0b',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.85rem 1.15rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <span className="badge badge-warning" style={{ fontSize: '0.72rem', fontWeight: 800 }}>STOCK BAJO</span>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', marginTop: '0.25rem' }}>{item.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#d1d5db' }}>SKU: {item.sku} | {item.category}</div>
+                </div>
+                <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#f59e0b', marginLeft: '1rem' }}>{item.stock}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Horizontal TV Section 2: Maintenance Expiration Timers */}
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.8)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 'var(--radius-md)',
+        padding: '1.25rem',
+        marginBottom: '1.25rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
+            <Wrench size={22} style={{ color: 'var(--coficab-copper)' }} />
+            TEMPORIZADORES DE MANTENIMIENTO PREVENTIVO
+          </h2>
+          <span style={{ fontSize: '0.82rem', color: '#9ca3af' }}>Equipos próximos a servicio</span>
+        </div>
+
+        {upcomingMaintenances.length === 0 ? (
+          <div style={{ padding: '1rem 1.5rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#9ca3af' }}>
+            <CheckCircle2 size={20} style={{ color: '#10b981' }} />
+            <span style={{ fontSize: '0.92rem' }}>No hay mantenimientos preventivos pendientes o por vencer en este momento.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '0.85rem' }}>
+            {upcomingMaintenances.map((m) => {
+              const isOverdue = m.daysLeft <= 0;
+              return (
+                <div key={m.id} style={{
+                  background: isOverdue ? 'rgba(239, 68, 68, 0.16)' : 'rgba(245, 158, 11, 0.14)',
+                  border: isOverdue ? '1.5px solid #ef4444' : '1px solid rgba(245, 158, 11, 0.4)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.85rem 1.15rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>{m.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#d1d5db' }}>
+                      SKU: {m.sku} | Área: {m.area || 'Planta'}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', marginLeft: '1rem' }}>
+                    {isOverdue ? (
+                      <span className="badge badge-outbound" style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800 }}>
+                        VENCIDO ({Math.abs(m.daysLeft)} d)
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                        <Calendar size={12} /> {m.daysLeft} días
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Horizontal TV Section 3: Live Movements Feed */}
+      <div style={{
+        background: 'rgba(15, 23, 42, 0.8)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 'var(--radius-md)',
+        padding: '1.25rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
+            <Clock size={22} style={{ color: '#60a5fa' }} />
+            ÚLTIMOS MOVIMIENTOS EN VIVO
+          </h2>
+          <span style={{ fontSize: '0.82rem', color: '#9ca3af' }}>Feed en tiempo real</span>
+        </div>
+
+        {recentTransactions.length === 0 ? (
+          <div style={{ padding: '1rem 1.5rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#9ca3af' }}>
+            <Clock size={20} />
+            <span style={{ fontSize: '0.92rem' }}>No hay movimientos recientes registrados en esta sesión.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.85rem' }}>
+            {recentTransactions.map((tx) => (
+              <div key={tx.id} style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.85rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '8px',
+                    background: tx.type === 'INBOUND' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)',
+                    color: tx.type === 'INBOUND' ? '#10b981' : '#f43f5e',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
                   }}>
-                    <div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>{m.name}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#d1d5db' }}>
-                        SKU: {m.sku} | Área: {m.area}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      {isOverdue ? (
-                        <span className="badge badge-outbound" style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.75rem' }}>
-                          VENCIDO (Hace {Math.abs(m.daysLeft)} d)
-                        </span>
-                      ) : (
-                        <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>
-                          <Calendar size={12} /> Vence en {m.daysLeft} días
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Panel 3: Live Movements Feed */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ffffff' }}>
-              <Clock size={20} style={{ color: '#60a5fa' }} />
-              ÚLTIMOS MOVIMIENTOS
-            </h2>
-            <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Feed en Vivo</span>
-          </div>
-
-          {recentTransactions.length === 0 ? (
-            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#9ca3af' }}>
-              <p style={{ fontSize: '0.9rem' }}>No hay movimientos recientes.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto' }}>
-              {recentTransactions.map((tx) => (
-                <div key={tx.id} style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '0.75rem 1rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '8px',
-                      background: tx.type === 'INBOUND' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)',
-                      color: tx.type === 'INBOUND' ? '#10b981' : '#f43f5e',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      {tx.type === 'INBOUND' ? <ArrowUpRight size={20} /> : <ArrowDownLeft size={20} />}
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>
-                        {tx.type === 'INBOUND' ? 'Entrada' : 'Salida'} de Stock
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>
-                        Por: {tx.user?.name || tx.user?.username || 'Usuario'}
-                      </div>
-                    </div>
+                    {tx.type === 'INBOUND' ? <ArrowUpRight size={22} /> : <ArrowDownLeft size={22} />}
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{
-                      fontSize: '1.15rem',
-                      fontWeight: 900,
-                      color: tx.type === 'INBOUND' ? '#10b981' : '#f43f5e'
-                    }}>
-                      {tx.type === 'INBOUND' ? `+${tx.quantity}` : `-${tx.quantity}`}
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff' }}>
+                      {tx.type === 'INBOUND' ? 'Entrada' : 'Salida'} de Stock
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-                      {new Date(tx.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                      Por: {tx.user?.name || tx.user?.username || 'Usuario'}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 900,
+                    color: tx.type === 'INBOUND' ? '#10b981' : '#f43f5e'
+                  }}>
+                    {tx.type === 'INBOUND' ? `+${tx.quantity}` : `-${tx.quantity}`}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+                    {new Date(tx.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
