@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch src --exec ts-node src/index.ts",
     "dev:sqlite": "copy /Y prisma\\schema.sqlite.prisma prisma\\schema.prisma && cross-env DATABASE_URL=\"file:./dev.db\" npx prisma db push && cross-env DATABASE_URL=\"file:./dev.db\" npx ts-node prisma/seed.ts && cross-env DATABASE_URL=\"file:./dev.db\" nodemon --watch src --exec ts-node src/index.ts",
+    "dev:postgres": "copy /Y prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma db push && npx ts-node prisma/seed.ts && nodemon --watch src --exec ts-node src/index.ts",
     "import:excel": "copy /Y prisma\\schema.sqlite.prisma prisma\\schema.prisma && cross-env DATABASE_URL=\"file:./dev.db\" npx prisma db push && cross-env DATABASE_URL=\"file:./dev.db\" node src/seed_from_coficab_excel.js",
     "build": "tsc && prisma generate",
     "start": "node dist/index.js",
