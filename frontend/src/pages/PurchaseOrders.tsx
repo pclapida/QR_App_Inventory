@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api, { Requisition } from '../services/api';
+import { RequisitionReportModal } from '../components/requisitions/RequisitionReportModal';
 import {
   ClipboardList,
   PlusCircle,
@@ -24,7 +25,8 @@ import {
   Check,
   X,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Printer
 } from 'lucide-react';
 
 const CATEGORY_OPTIONS = [
@@ -84,6 +86,10 @@ export const PurchaseOrders: React.FC = () => {
   const [receiveBy, setReceiveBy] = useState<string>('');
   const [receivePoNumber, setReceivePoNumber] = useState<string>('');
   const [receiving, setReceiving] = useState<boolean>(false);
+
+  // PDF Report State
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [reportSingleItem, setReportSingleItem] = useState<Requisition | null>(null);
 
   const fetchRequisitions = async () => {
     setLoading(true);
@@ -567,6 +573,19 @@ export const PurchaseOrders: React.FC = () => {
               <option value="RECEIVED">Recibidas (+Stock)</option>
               <option value="CANCELLED">Canceladas</option>
             </select>
+
+            {/* PDF Report Button */}
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setReportSingleItem(null);
+                setShowReportModal(true);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderColor: 'var(--coficab-blue-bright)', color: 'var(--coficab-blue-bright)', fontSize: '0.88rem' }}
+              title="Generar formato o reporte consolidado para imprimir o exportar a PDF"
+            >
+              <Printer size={16} /> Exportar Reporte PDF
+            </button>
           </div>
         </div>
 
@@ -578,19 +597,19 @@ export const PurchaseOrders: React.FC = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left' }}>
-                  <th style={{ padding: '0.85rem 1rem' }}>Requisición (Folio)</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Destino / Requisición Para</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Artículo & Tipo</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Cant.</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Precio Unit.</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Total</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Proveedor</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Orden de Compra (OC)</th>
-                  <th style={{ padding: '0.85rem 1rem' }}>Estado</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Acciones</th>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '0.75rem 1rem' }}>Folio Req.</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Destino / Para</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Artículo & Tipo</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Cant.</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Precio Unit.</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Total</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Proveedor</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>No. OC</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>Estado</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -683,6 +702,18 @@ export const PurchaseOrders: React.FC = () => {
                       {/* Acciones */}
                       <td style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              setReportSingleItem(req);
+                              setShowReportModal(true);
+                            }}
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
+                            title="Imprimir formato oficial de esta requisición"
+                          >
+                            <Printer size={14} />
+                          </button>
+
                           {!isReceived && req.status !== 'CANCELLED' && (
                             <button
                               className="btn btn-success"
@@ -990,6 +1021,18 @@ export const PurchaseOrders: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Requisition Official PDF / Print Modal */}
+      {showReportModal && (
+        <RequisitionReportModal
+          requisitions={filteredRequisitions}
+          selectedSingle={reportSingleItem}
+          onClose={() => {
+            setShowReportModal(false);
+            setReportSingleItem(null);
+          }}
+        />
       )}
     </div>
   );

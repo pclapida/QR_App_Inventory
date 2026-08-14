@@ -7,10 +7,35 @@ const router = Router();
 
 router.use(authenticateToken);
 
-// GET /api/purchase-orders - List all requisitions / purchase orders
+// GET /api/purchase-orders - List all requisitions / purchase orders with search and filters
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const { q, status, supplier } = req.query;
+    const whereClause: any = {};
+
+    if (status && typeof status === 'string' && status.trim() !== '') {
+      whereClause.status = status.trim();
+    }
+
+    if (supplier && typeof supplier === 'string' && supplier.trim() !== '') {
+      whereClause.supplier = { contains: supplier.trim(), mode: 'insensitive' };
+    }
+
+    if (q && typeof q === 'string' && q.trim() !== '') {
+      const query = q.trim();
+      whereClause.OR = [
+        { itemName: { contains: query, mode: 'insensitive' } },
+        { reqNumber: { contains: query, mode: 'insensitive' } },
+        { poNumber: { contains: query, mode: 'insensitive' } },
+        { requisitionFor: { contains: query, mode: 'insensitive' } },
+        { supplier: { contains: query, mode: 'insensitive' } },
+        { category: { contains: query, mode: 'insensitive' } },
+        { notes: { contains: query, mode: 'insensitive' } }
+      ];
+    }
+
     const orders = await prisma.purchaseOrder.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
 

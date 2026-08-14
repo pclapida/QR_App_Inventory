@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Item } from '../../services/api';
+import api, { Item } from '../../services/api';
+import { SecurityUnlockModal } from '../SecurityUnlockModal';
 import {
   Package,
   X,
@@ -41,7 +42,20 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   onReactivate
 }) => {
   const [detailSecurityUnlocked, setDetailSecurityUnlocked] = useState<boolean>(false);
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [unlockedKeys, setUnlockedKeys] = useState<{ bitlockerKey?: string | null; devicePassword?: string | null } | null>(null);
   const isDecommissioned = item.status === 'DECOMMISSIONED';
+
+  const handleUnlockSuccess = async () => {
+    setShowUnlockModal(false);
+    setDetailSecurityUnlocked(true);
+    try {
+      const res = await api.get(`/items/${item.id}/security-keys`);
+      setUnlockedKeys(res.data);
+    } catch (err) {
+      console.error('Error al cargar claves de seguridad:', err);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -235,22 +249,21 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {!detailSecurityUnlocked ? (
               <button
                 className="btn btn-secondary"
-                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-                onClick={() => {
-                  const pass = prompt('Ingrese contraseña maestra para ver seguridad:');
-                  if (pass === 'master123') setDetailSecurityUnlocked(true);
-                  else if (pass) alert('Contraseña incorrecta');
-                }}
+                style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                onClick={() => setShowUnlockModal(true)}
               >
-                🔓 Desbloquear
+                <Unlock size={14} /> Desbloquear Claves
               </button>
             ) : (
               <button
                 className="btn btn-secondary"
-                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-                onClick={() => setDetailSecurityUnlocked(false)}
+                style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => {
+                  setDetailSecurityUnlocked(false);
+                  setUnlockedKeys(null);
+                }}
               >
-                🔒 Bloquear
+                <Lock size={14} /> Bloquear
               </button>
             )}
           </div>
@@ -258,21 +271,21 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Clave BitLocker</div>
-                <div style={{ fontFamily: 'monospace', fontWeight: 700, color: item.bitlockerKey ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: item.bitlockerKey ? 'normal' : 'italic' }}>
-                  {item.bitlockerKey || 'No configurado'}
+                <div style={{ fontFamily: 'monospace', fontWeight: 700, color: (unlockedKeys?.bitlockerKey || item.bitlockerKey) ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: (unlockedKeys?.bitlockerKey || item.bitlockerKey) ? 'normal' : 'italic' }}>
+                  {unlockedKeys?.bitlockerKey || item.bitlockerKey || 'No configurado'}
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Contraseña Dispositivo</div>
-                <div style={{ fontFamily: 'monospace', fontWeight: 700, color: item.devicePassword ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: item.devicePassword ? 'normal' : 'italic' }}>
-                  {item.devicePassword || 'No configurado'}
+                <div style={{ fontFamily: 'monospace', fontWeight: 700, color: (unlockedKeys?.devicePassword || item.devicePassword) ? '#10b981' : 'var(--text-muted)', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', wordBreak: 'break-all', fontStyle: (unlockedKeys?.devicePassword || item.devicePassword) ? 'normal' : 'italic' }}>
+                  {unlockedKeys?.devicePassword || item.devicePassword || 'No configurado'}
                 </div>
               </div>
             </div>
           )}
           {!detailSecurityUnlocked && (
             <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Clave BitLocker y contraseña del dispositivo protegidas. Presiona "Desbloquear" para verlas.
+              Clave BitLocker y contraseña del dispositivo protegidas. Presione "Desbloquear Claves" para autenticarse y visualizarlas.
             </p>
           )}
         </div>
@@ -339,6 +352,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
           </div>
         </div>
+
+        {/* Security Unlock Modal */}
+        {showUnlockModal && (
+          <SecurityUnlockModal
+            title="Desbloqueo de Claves de Seguridad"
+            subtitle={`Ingrese su contraseña para consultar la clave BitLocker y contraseña de acceso del equipo "${item.name}".`}
+            onSuccess={handleUnlockSuccess}
+            onClose={() => setShowUnlockModal(false)}
+          />
+        )}
       </div>
     </div>
   );

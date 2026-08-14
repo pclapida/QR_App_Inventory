@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { Item } from '../services/api';
 import { QRModal } from '../components/QRModal';
-import { PlusCircle, AlertCircle, ArrowLeft, AlertTriangle, ShieldCheck, Package, Trash2 } from 'lucide-react';
+import { SecurityUnlockModal } from '../components/SecurityUnlockModal';
+import { PlusCircle, AlertCircle, ArrowLeft, AlertTriangle, ShieldCheck, Package, Trash2, Lock, Unlock } from 'lucide-react';
 
 export const AddItem: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export const AddItem: React.FC = () => {
   const [sku, setSku] = useState<string>('');
   const [unit, setUnit] = useState<string>('unidad');
   const [assignedTo, setAssignedTo] = useState<string>('');
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
 
   const [isITInternal, setIsITInternal] = useState<boolean>(() => searchParams.get('isIT') === '1');
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
@@ -466,18 +468,19 @@ export const AddItem: React.FC = () => {
             <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <label className="form-label" style={{ margin: 0, fontWeight: 800, color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons" style={{ fontSize: '18px' }}>lock</span> Datos de Seguridad (Solo Administrador)
+                  <Lock size={18} /> Datos de Seguridad (Solo Administrador)
                 </label>
                 {!securityUnlocked ? (
-                  <button type="button" onClick={() => {
-                    const pass = prompt('Ingrese contraseña maestra para editar seguridad:');
-                    if (pass === 'master123') setSecurityUnlocked(true);
-                    else if (pass) alert('Contraseña incorrecta');
-                  }} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}>
-                    Desbloquear
+                  <button
+                    type="button"
+                    onClick={() => setShowUnlockModal(true)}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
+                  >
+                    <Unlock size={14} /> Desbloquear
                   </button>
                 ) : (
-                  <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Desbloqueado</span>
+                  <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>🔓 Desbloqueado para captura</span>
                 )}
               </div>
 
@@ -494,7 +497,7 @@ export const AddItem: React.FC = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Contraseña de Dispositivo</label>
+                  <label className="form-label">Contraseña de Dispositivo / BIOS</label>
                   <input
                     type={securityUnlocked ? 'text' : 'password'}
                     className="form-input"
@@ -523,7 +526,7 @@ export const AddItem: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={handleAddCustomField}
+                onClick={() => setCustomFields([...customFields, { key: '', value: '' }])}
                 style={{ fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
               >
                 <PlusCircle size={16} />
@@ -540,21 +543,29 @@ export const AddItem: React.FC = () => {
                       className="form-input"
                       placeholder="Nombre del Campo (ej. Clave Bitlocker / Proveedor)"
                       value={field.key}
-                      onChange={(e) => handleCustomFieldChange(idx, 'key', e.target.value)}
-                      style={{ flex: 1, minWidth: '200px', fontWeight: 700 }}
+                      onChange={(e) => {
+                        const updated = [...customFields];
+                        updated[idx].key = e.target.value;
+                        setCustomFields(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '180px', fontWeight: 700 }}
                     />
                     <input
                       type="text"
                       className="form-input"
                       placeholder="Valor (ej. 81135362 / Dell México)"
                       value={field.value}
-                      onChange={(e) => handleCustomFieldChange(idx, 'value', e.target.value)}
-                      style={{ flex: 1, minWidth: '200px' }}
+                      onChange={(e) => {
+                        const updated = [...customFields];
+                        updated[idx].value = e.target.value;
+                        setCustomFields(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '180px' }}
                     />
                     <button
                       type="button"
                       className="btn btn-danger"
-                      onClick={() => handleRemoveCustomField(idx)}
+                      onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
                       style={{ padding: '0.55rem', borderRadius: 'var(--radius-sm)' }}
                       title="Eliminar este campo"
                     >
@@ -564,8 +575,8 @@ export const AddItem: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem', fontStyle: 'italic', background: 'var(--bg-card)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-                No ha añadido ningún campo personalizado adicional. Presione "Añadir Nuevo Campo" para agregar un nuevo dato a este registro.
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                No ha añadido ningún campo personalizado adicional.
               </div>
             )}
           </div>
@@ -599,6 +610,19 @@ export const AddItem: React.FC = () => {
             setCreatedItem(null);
             navigate('/inventory');
           }}
+        />
+      )}
+
+      {/* Security Unlock Modal */}
+      {showUnlockModal && (
+        <SecurityUnlockModal
+          title="Autorización para Captura de Seguridad"
+          subtitle="Ingrese su contraseña de administrador para capturar claves BitLocker o contraseñas del dispositivo."
+          onSuccess={() => {
+            setShowUnlockModal(false);
+            setSecurityUnlocked(true);
+          }}
+          onClose={() => setShowUnlockModal(false)}
         />
       )}
     </div>

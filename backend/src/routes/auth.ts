@@ -100,4 +100,47 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+// POST /api/auth/verify-master - Verify password or master key before unlocking sensitive data
+router.post('/verify-master', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { password } = req.body;
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Debe ingresar una contraseña válida' });
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // 1. Check if it matches the current user's password
+    const isUserPasswordValid = await bcrypt.compare(password, user.password);
+
+    // 2. Check if it matches configured master security key
+    const masterKey = process.env.MASTER_SECURITY_KEY || 'master123';
+    const isMasterKeyValid = password === masterKey;
+
+    if (!isUserPasswordValid && !isMasterKeyValid) {
+      return res.status(401).json({ error: 'Contraseña de autorización incorrecta' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Identidad y permisos verificados exitosamente',
+      verifiedBy: user.name || user.username
+    });
+  } catch (error: any) {
+    console.error('Error en /verify-master:', error);
+    return res.status(500).json({ error: 'Error al verificar credenciales' });
+  }
+});
+
 export default router;

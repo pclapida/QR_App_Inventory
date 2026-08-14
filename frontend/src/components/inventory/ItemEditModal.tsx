@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Item } from '../../services/api';
+import { SecurityUnlockModal } from '../SecurityUnlockModal';
 import { X, Check, ShieldCheck, AlertTriangle, PlusCircle, Trash2, Lock, Unlock } from 'lucide-react';
 
 export interface ItemEditFormData {
@@ -34,6 +35,7 @@ interface ItemEditModalProps {
 
 export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onSave }) => {
   const [editSecurityUnlocked, setEditSecurityUnlocked] = useState<boolean>(false);
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
 
@@ -79,6 +81,22 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
       setCustomFields([]);
     }
   }, [item]);
+
+  const handleAddCustomField = () => {
+    setCustomFields(prev => [...prev, { key: '', value: '' }]);
+  };
+
+  const handleCustomFieldChange = (index: number, field: 'key' | 'value', val: string) => {
+    setCustomFields(prev => {
+      const updated = [...prev];
+      updated[index][field] = val;
+      return updated;
+    });
+  };
+
+  const handleRemoveCustomField = (index: number) => {
+    setCustomFields(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -348,18 +366,14 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                   {!editSecurityUnlocked ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        const pass = prompt('Ingrese contraseña maestra para ver/editar seguridad:');
-                        if (pass === 'master123') setEditSecurityUnlocked(true);
-                        else if (pass) alert('Contraseña incorrecta');
-                      }}
+                      onClick={() => setShowUnlockModal(true)}
                       className="btn btn-secondary"
-                      style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                      style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
                     >
                       <Unlock size={14} /> Desbloquear
                     </button>
                   ) : (
-                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>Desbloqueado</span>
+                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>🔓 Desbloqueado para edición</span>
                   )}
                 </div>
 
@@ -376,13 +390,13 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Contraseña de Dispositivo</label>
+                    <label className="form-label">Contraseña del Dispositivo / BIOS</label>
                     <input
                       type={editSecurityUnlocked ? 'text' : 'password'}
                       className="form-input"
                       value={formData.devicePassword}
                       onChange={(e) => setFormData({ ...formData, devicePassword: e.target.value })}
-                      placeholder={editSecurityUnlocked ? 'Ej. Admin.2026' : '••••••••••••'}
+                      placeholder={editSecurityUnlocked ? 'Contraseña local o de arranque' : '••••••••••••'}
                       disabled={!editSecurityUnlocked}
                     />
                   </div>
@@ -391,62 +405,47 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             )}
 
             {/* Dynamic Custom Fields Section */}
-            <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div>
-                  <label className="form-label" style={{ color: 'var(--coficab-copper)', fontWeight: 800, fontSize: '0.95rem', marginBottom: 0 }}>
-                    Campos y Atributos Personalizados Dinámicos
-                  </label>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                    Agregue o elimine libremente nuevos campos (ej. Clave Bitlocker, N° Factura, Proveedor, Voltaje, Licencia, MAC Address, etc.).
-                  </p>
-                </div>
-
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
+                  10. Atributos y Especificaciones Personalizadas
+                </label>
                 <button
                   type="button"
+                  onClick={handleAddCustomField}
                   className="btn btn-secondary"
-                  onClick={() => setCustomFields([...customFields, { key: '', value: '' }])}
-                  style={{ fontSize: '0.82rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
                 >
-                  <PlusCircle size={16} />
-                  Añadir Nuevo Campo
+                  <PlusCircle size={14} /> Añadir Nuevo Campo
                 </button>
               </div>
 
               {customFields.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   {customFields.map((field, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div key={idx} style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                       <input
                         type="text"
+                        placeholder="Nombre de la propiedad (ej. RAM, SSD, Tarjeta de Video)"
                         className="form-input"
-                        placeholder="Nombre del Campo (ej. Clave Bitlocker / Proveedor)"
                         value={field.key}
-                        onChange={(e) => {
-                          const updated = [...customFields];
-                          updated[idx].key = e.target.value;
-                          setCustomFields(updated);
-                        }}
-                        style={{ flex: 1, minWidth: '180px', fontWeight: 700 }}
+                        onChange={(e) => handleCustomFieldChange(idx, 'key', e.target.value)}
+                        style={{ flex: 1 }}
                       />
                       <input
                         type="text"
+                        placeholder="Valor / Detalle (ej. 32 GB DDR5, 1TB NVMe)"
                         className="form-input"
-                        placeholder="Valor (ej. 81135362 / Dell México)"
                         value={field.value}
-                        onChange={(e) => {
-                          const updated = [...customFields];
-                          updated[idx].value = e.target.value;
-                          setCustomFields(updated);
-                        }}
-                        style={{ flex: 1, minWidth: '180px' }}
+                        onChange={(e) => handleCustomFieldChange(idx, 'value', e.target.value)}
+                        style={{ flex: 2 }}
                       />
                       <button
                         type="button"
+                        onClick={() => handleRemoveCustomField(idx)}
                         className="btn btn-danger"
-                        onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
-                        style={{ padding: '0.55rem', borderRadius: 'var(--radius-sm)' }}
-                        title="Eliminar este campo"
+                        style={{ padding: '0.45rem', minWidth: 'auto' }}
+                        title="Eliminar campo"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -472,6 +471,19 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             </button>
           </div>
         </form>
+
+        {/* Security Unlock Modal */}
+        {showUnlockModal && (
+          <SecurityUnlockModal
+            title="Autorización para Edición de Seguridad"
+            subtitle={`Ingrese su contraseña de administrador para desbloquear la edición de claves BitLocker y contraseña de acceso.`}
+            onSuccess={() => {
+              setShowUnlockModal(false);
+              setEditSecurityUnlocked(true);
+            }}
+            onClose={() => setShowUnlockModal(false)}
+          />
+        )}
       </div>
     </div>
   );
