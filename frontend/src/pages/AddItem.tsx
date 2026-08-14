@@ -317,8 +317,14 @@ export const AddItem: React.FC = () => {
                   type="text"
                   className="form-input"
                   value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  placeholder="ej. Almacén 2 - Extrusión"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setArea(val);
+                    if (['it', 'sistemas', 'taller it', 'taller interno it'].includes(val.toLowerCase().trim())) {
+                      setIsITInternal(true);
+                    }
+                  }}
+                  placeholder="ej. Almacén 2 - Extrusión, Calidad, IT..."
                 />
               </div>
 

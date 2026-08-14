@@ -193,7 +193,16 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 type="text"
                 className="form-input"
                 value={formData.area}
-                onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const isIT = ['it', 'sistemas', 'taller it', 'taller interno it'].includes(val.toLowerCase().trim());
+                  setFormData({
+                    ...formData,
+                    area: val,
+                    isITInternal: isIT ? true : formData.isITInternal
+                  });
+                }}
+                placeholder="ej. Mantenimiento, Calidad, IT..."
               />
             </div>
 
@@ -206,6 +215,33 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.ipAddress}
                 onChange={(e) => setFormData({ ...formData, ipAddress: e.target.value })}
               />
+            </div>
+
+            {/* Tipo de Inventario (Plantas vs IT Interno) */}
+            <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <label className="form-label" style={{ fontWeight: 800, color: formData.isITInternal ? 'var(--coficab-copper)' : 'var(--coficab-blue-bright)', marginBottom: '0.4rem' }}>
+                Destino / Tipo de Inventario
+              </label>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600, color: !formData.isITInternal ? 'var(--coficab-blue-bright)' : 'var(--text-muted)' }}>
+                  <input
+                    type="radio"
+                    name="editIsITInternal"
+                    checked={!formData.isITInternal}
+                    onChange={() => setFormData({ ...formData, isITInternal: false })}
+                  />
+                  🏢 Inventario Operativo de Plantas (Equipos en Uso Activo)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontWeight: 600, color: formData.isITInternal ? 'var(--coficab-copper)' : 'var(--text-muted)' }}>
+                  <input
+                    type="radio"
+                    name="editIsITInternal"
+                    checked={formData.isITInternal}
+                    onChange={() => setFormData({ ...formData, isITInternal: true })}
+                  />
+                  🛠️ Inventario Interno de IT (Stock Almacén / Refacciones)
+                </label>
+              </div>
             </div>
 
             {/* Garantía */}
@@ -261,9 +297,21 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
               />
             </div>
 
+            {/* 7. Asignado a */}
+            <div className="form-group">
+              <label className="form-label">7. Persona / Colaborador Asignado</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.assignedTo}
+                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                placeholder="Nombre del colaborador..."
+              />
+            </div>
+
             {/* Categoría */}
             <div className="form-group">
-              <label className="form-label">Categoría</label>
+              <label className="form-label" style={{ color: 'var(--coficab-copper)', fontWeight: 800 }}>Categoría</label>
               <select
                 className="form-input"
                 value={formData.category}

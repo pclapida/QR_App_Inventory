@@ -122,6 +122,7 @@ router.post('/import-excel', requireAdmin, upload.single('file'), async (req: Au
       }
       knownSkus.add(finalSku);
 
+      const isIT = Boolean(area && ['it', 'sistemas', 'taller it', 'taller interno it'].includes(area.toLowerCase().trim()));
       const qrCodePayload = `INV-${newItemId}`;
 
       itemsToCreate.push({
@@ -140,8 +141,9 @@ router.post('/import-excel', requireAdmin, upload.single('file'), async (req: Au
         stock: stock,
         minStock: 1,
         unit: 'unidad',
-        location: area || null,
+        location: isIT ? 'Taller Interno IT' : (area || null),
         plant: determinePlant(name, finalSku, model, 'Planta 2'),
+        isITInternal: isIT,
         qrCodePayload
       });
     }
@@ -438,7 +440,9 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
     }
 
     const qrCodePayload = `INV-${newItemId}`;
-    const isIT = typeof isITInternal === 'boolean' ? isITInternal : (isITInternal === 'true' || isITInternal === '1');
+    const isIT = typeof isITInternal === 'boolean'
+      ? isITInternal
+      : (isITInternal === 'true' || isITInternal === '1' || Boolean(area && ['it', 'sistemas', 'taller it', 'taller interno it'].includes(area.toLowerCase().trim())));
 
     let customAttrStr: string | null = null;
     if (customAttributes) {
@@ -615,7 +619,9 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
         description: description !== undefined ? description : existing.description,
         category: category !== undefined ? determineCategory(updatedName, updatedModel || '', category) : determineCategory(updatedName, updatedModel || '', existing.category || 'Equipos & Dispositivos'),
         plant: newPlant,
-        isITInternal: isITInternal !== undefined ? Boolean(isITInternal) : existing.isITInternal,
+        isITInternal: isITInternal !== undefined
+          ? Boolean(isITInternal)
+          : (area !== undefined && area && ['it', 'sistemas', 'taller it', 'taller interno it'].includes(area.toLowerCase().trim()) ? true : existing.isITInternal),
         assignedTo: assignedTo !== undefined ? (assignedTo ? assignedTo.trim() : null) : existing.assignedTo,
         customAttributes: customAttrStr,
         bitlockerKey: bitlockerKey !== undefined ? (bitlockerKey ? bitlockerKey.trim() : null) : existing.bitlockerKey,

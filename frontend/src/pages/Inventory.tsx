@@ -270,12 +270,12 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       }}>
         <div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            {inventoryTab === 'IT' ? 'Inventario Interno del Departamento de IT' : 'Panel General de Inventario Operativo COFICAB'}
+            {inventoryTab === 'IT' ? 'Inventario Interno del Departamento de IT' : 'Panel de Equipos Operativos en Plantas'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             {inventoryTab === 'IT'
               ? 'Stock de taller de Sistemas, equipos de respaldo, refacciones, repuestos, cables, adaptadores y consumibles de IT.'
-              : 'Gestión completa de existencias, garantías de equipos y etiquetas QR en Planta 1, 2, 3 u UPCAST.'}
+              : 'Monitoreo y control de equipos y dispositivos en funcionamiento activo en líneas y áreas operativas (Planta 1, 2, 3 u UPCAST).'}
           </p>
         </div>
 
@@ -356,7 +356,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           onClick={() => setStatusFilter('ACTIVE')}
           style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}
         >
-          🟢 Inventario Activo (En Servicio / Stock)
+          🟢 {inventoryTab === 'IT' ? 'Inventario Activo (En Stock)' : 'Equipos Activos (En Servicio)'}
         </button>
         <button
           className={`btn ${statusFilter === 'DECOMMISSIONED' ? 'btn-danger' : 'btn-secondary'}`}
@@ -388,7 +388,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           onClick={() => setOnlyLowStock(false)}
         >
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <span>Total Artículos</span>
+            <span>{inventoryTab === 'IT' ? 'Total Artículos IT' : 'Total Equipos Registrados'}</span>
             <Package size={20} style={{ color: 'var(--primary)' }} />
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
@@ -398,7 +398,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
         <div className="glass-panel" style={{ padding: '1.25rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <span>Stock Unidades Total</span>
+            <span>{inventoryTab === 'IT' ? 'Stock Total en Almacén IT' : 'Unidades en Operación (Uso)'}</span>
             <Layers size={20} style={{ color: '#10b981' }} />
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
@@ -406,24 +406,36 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           </div>
         </div>
 
-        <div
-          className="glass-panel glass-panel-interactive"
-          style={{
-            padding: '1.25rem',
-            cursor: 'pointer',
-            borderColor: onlyLowStock ? '#f59e0b' : lowStockCount > 0 ? 'rgba(245, 158, 11, 0.4)' : undefined,
-            background: onlyLowStock ? 'rgba(245, 158, 11, 0.15)' : undefined
-          }}
-          onClick={() => setOnlyLowStock(!onlyLowStock)}
-        >
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <span>Alertas Reabastecimiento</span>
-            <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
+        {inventoryTab === 'IT' ? (
+          <div
+            className="glass-panel glass-panel-interactive"
+            style={{
+              padding: '1.25rem',
+              cursor: 'pointer',
+              borderColor: onlyLowStock ? '#f59e0b' : lowStockCount > 0 ? 'rgba(245, 158, 11, 0.4)' : undefined,
+              background: onlyLowStock ? 'rgba(245, 158, 11, 0.15)' : undefined
+            }}
+            onClick={() => setOnlyLowStock(!onlyLowStock)}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <span>Alertas Reabastecimiento</span>
+              <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b', marginTop: '0.25rem' }}>
+              {lowStockCount} <small style={{ fontSize: '0.75rem', fontWeight: 500 }}>{onlyLowStock ? '(Filtrando)' : '(Clic para filtrar)'}</small>
+            </div>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b', marginTop: '0.25rem' }}>
-            {lowStockCount} <small style={{ fontSize: '0.75rem', fontWeight: 500 }}>{onlyLowStock ? '(Filtrando)' : '(Clic para filtrar)'}</small>
+        ) : (
+          <div className="glass-panel" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <span>Equipos con Garantía Activa</span>
+              <ShieldCheck size={20} style={{ color: 'var(--coficab-blue-bright)' }} />
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--coficab-blue-bright)', marginTop: '0.25rem' }}>
+              {items.filter(i => i.hasWarranty).length}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 
@@ -529,11 +541,13 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {Object.keys(groupedItems).map(cat => {
               const catItems = groupedItems[cat];
               const isExpanded = expandedCategories[cat];
+              const isPlantMode = inventoryTab === 'PLANT';
               const isConsumable = cat === 'Consumibles' || cat === 'Herramientas';
+              const totalInUse = catItems.reduce((acc, i) => acc + i.stock, 0);
+
               const availableStock = isConsumable ? 0 : catItems.filter(i => {
                 if (i.stock <= 0) return false;
                 const assigned = i.assignedTo?.toLowerCase().trim() || '';
-                // Considerarlo disponible en el almacén de IT si no está asignado o está asignado genéricamente a IT
                 if (assigned && !['it', 'taller interno it', 'sistemas', 'taller it'].includes(assigned)) {
                   return false;
                 }
@@ -542,7 +556,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               const targetMin = CATEGORY_MIN_STOCK[cat] || 2;
               const isLow = !isConsumable && (availableStock < targetMin);
               const consumablesLow = isConsumable ? catItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)).length : 0;
-              const hasAlert = isLow || consumablesLow > 0;
+              
+              // Only IT Internal Inventory uses stock replenishment alerts. Plant view is operational equipment in use.
+              const hasAlert = !isPlantMode && (isLow || consumablesLow > 0);
 
               let CatIcon = Package;
               if (cat.toLowerCase().includes('laptop')) CatIcon = Laptop;
@@ -591,7 +607,25 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                      {isConsumable ? (
+                      {isPlantMode ? (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
+                            Equipos en Operación
+                          </div>
+                          <div style={{ 
+                            fontSize: '1.35rem', 
+                            fontWeight: 800, 
+                            color: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            justifyContent: 'flex-end'
+                          }}>
+                            <CheckCircle2 size={18} />
+                            {totalInUse} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' }}>en uso</span>
+                          </div>
+                        </div>
+                      ) : isConsumable ? (
                         consumablesLow > 0 && (
                           <span className="badge badge-warning" style={{ padding: '0.4rem 0.75rem' }}>
                             <AlertTriangle size={14} /> {consumablesLow} items con bajo stock
@@ -635,14 +669,14 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                               <th style={{ padding: '0.75rem 1rem' }}>N° Serie & IP</th>
                               <th style={{ padding: '0.75rem 1rem' }}>Garantía</th>
                               <th style={{ padding: '0.75rem 1rem' }}>Área / Asignado</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Stock</th>
+                              <th style={{ padding: '0.75rem 1rem' }}>{isPlantMode ? 'Unidades en Uso' : 'Stock Almacén'}</th>
                               <th style={{ padding: '0.75rem 1rem' }}>Código QR</th>
                               <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
                             </tr>
                           </thead>
                           <tbody>
                             {catItems.map((item) => {
-                              const isLowStock = isConsumable ? ((item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)) : false;
+                              const isLowStock = !isPlantMode && (isConsumable ? ((item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)) : false);
                               return (
                                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                   <td style={{ padding: '0.85rem 1rem' }}>
@@ -720,20 +754,30 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     {!item.area && !item.assignedTo && '-'}
                                   </td>
                                   <td style={{ padding: '0.85rem 1rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    {isPlantMode ? (
                                       <span style={{
                                         fontWeight: 800,
-                                        fontSize: '1rem',
-                                        color: isLowStock ? '#d97706' : '#10b981'
+                                        fontSize: '0.95rem',
+                                        color: item.stock > 0 ? '#10b981' : 'var(--text-muted)'
                                       }}>
-                                        {item.stock} {item.unit}s
+                                        {item.stock} {item.stock === 1 ? 'unidad' : 'unidades'}
                                       </span>
-                                      {isLowStock && (
-                                        <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
-                                          Bajo
+                                    ) : (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <span style={{
+                                          fontWeight: 800,
+                                          fontSize: '1rem',
+                                          color: isLowStock ? '#d97706' : '#10b981'
+                                        }}>
+                                          {item.stock} {item.unit || 'unidad'}{item.stock !== 1 ? 's' : ''}
                                         </span>
-                                      )}
-                                    </div>
+                                        {isLowStock && (
+                                          <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
+                                            Bajo Stock
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
                                   <td style={{ padding: '0.85rem 1rem' }}>
                                     <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
