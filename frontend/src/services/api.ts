@@ -25,6 +25,13 @@ export interface Item {
   plant?: string;
   isITInternal?: boolean;
   assignedTo?: string;
+  status?: 'ACTIVE' | 'DECOMMISSIONED';
+  decommissionDate?: string;
+  decommissionReason?: string;
+  decommissionNotes?: string;
+  decommissionedBy?: string;
+  disposalMethod?: string;
+  decommissionActNumber?: string;
   bitlockerKey?: string;
   devicePassword?: string;
   customAttributes?: string | Record<string, string>;
@@ -37,6 +44,17 @@ export interface Item {
   updatedAt: string;
   transactions?: Transaction[];
   maintenances?: any[];
+  responsivas?: ResponsivaHistory[];
+}
+
+export interface TimelineEvent {
+  id: string;
+  type: 'CREATION' | 'INBOUND' | 'OUTBOUND' | 'TRANSFER' | 'EDIT' | 'MAINTENANCE' | 'RESPONSIVA' | 'DECOMMISSION' | 'REACTIVATE';
+  title: string;
+  description: string;
+  date: string;
+  performedBy: string;
+  meta?: Record<string, any>;
 }
 
 export interface Transaction {

@@ -162,8 +162,16 @@ router.post('/import-excel', requireAdmin, upload.single('file'), async (req: Au
 // GET /api/items - List all items with optional pagination and filters
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { q, category, plant, isITInternal, page, limit } = req.query;
+    const { q, category, plant, isITInternal, status, page, limit } = req.query;
     const whereClause: any = {};
+
+    if (status && typeof status === 'string' && status.trim() !== '') {
+      if (status.toUpperCase() !== 'ALL') {
+        whereClause.status = status.toUpperCase();
+      }
+    } else {
+      whereClause.status = 'ACTIVE';
+    }
 
     if (isITInternal !== undefined && isITInternal !== '') {
       whereClause.isITInternal = isITInternal === 'true' || isITInternal === '1';
@@ -571,6 +579,225 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
   } catch (error: any) {
     console.error('Error al actualizar artículo:', error);
     return res.status(500).json({ error: 'Error al actualizar el artículo' });
+  }
+});
+
+// POST /api/items/:id/decommission - Decommission / Scrap an asset
+router.post('/:id/decommission', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason, notes, responsiblePerson, disposalMethod, decommissionActNumber } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ error: 'El motivo de la baja es obligatorio.' });
+    }
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const year = new Date().getFullYear();
+    const randomSuffix = uuidv4().split('-')[0].toUpperCase();
+    const finalActNumber = decommissionActNumber && decommissionActNumber.trim()
+      ? decommissionActNumber.trim()
+      : `BAJA-${year}-${randomSuffix}`;
+
+    const authorizer = responsiblePerson && responsiblePerson.trim()
+      ? responsiblePerson.trim()
+      : (req.user?.username || 'Admin');
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          status: 'DECOMMISSIONED',
+          stock: 0,
+          assignedTo: null,
+          decommissionDate: new Date(),
+          decommissionReason: reason.trim(),
+          decommissionNotes: notes ? notes.trim() : null,
+          decommissionedBy: authorizer,
+          disposalMethod: disposalMethod ? disposalMethod.trim() : 'Contenedor E-Waste / Desecho',
+          decommissionActNumber: finalActNumber
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'DECOMMISSION',
+          quantity: item.stock || 1,
+          fromPlant: item.plant,
+          toPlant: 'SCRAP / E-WASTE',
+          notes: `Baja de activo / Scrap (${finalActNumber}): Motivo: ${reason}. Disposición: ${disposalMethod || 'E-Waste'}. ${notes ? `Notas: ${notes}` : ''}`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ item: updatedItem, message: `Equipo ${item.name} dado de baja exitosamente con acta ${finalActNumber}.` });
+  } catch (error: any) {
+    console.error('Error al dar de baja el artículo:', error);
+    return res.status(500).json({ error: 'Error al procesar la baja del artículo.' });
+  }
+});
+
+// POST /api/items/:id/reactivate - Reactivate a decommissioned asset
+router.post('/:id/reactivate', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { newStock, notes } = req.body;
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const stockVal = newStock !== undefined ? parseInt(newStock, 10) : 1;
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          status: 'ACTIVE',
+          stock: isNaN(stockVal) || stockVal < 1 ? 1 : stockVal,
+          decommissionDate: null,
+          decommissionReason: null,
+          decommissionNotes: null,
+          decommissionedBy: null,
+          disposalMethod: null,
+          decommissionActNumber: null
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'REACTIVATE',
+          quantity: updated.stock,
+          fromPlant: 'SCRAP / E-WASTE',
+          toPlant: item.plant,
+          notes: `Reactivación de activo al inventario activo. ${notes ? `Notas: ${notes}` : ''}`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ item: updatedItem, message: `Equipo ${item.name} reactivado exitosamente.` });
+  } catch (error: any) {
+    console.error('Error al reactivar artículo:', error);
+    return res.status(500).json({ error: 'Error al reactivar el artículo.' });
+  }
+});
+
+// GET /api/items/:id/timeline - Unified Asset Lifecycle Timeline
+router.get('/:id/timeline', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const item = await prisma.item.findUnique({
+      where: { id },
+      include: {
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { id: true, name: true, username: true } }
+          }
+        },
+        maintenances: {
+          orderBy: { performedAt: 'desc' }
+        },
+        responsivas: {
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    // Build timeline events array
+    const events: Array<{
+      id: string;
+      type: 'CREATION' | 'INBOUND' | 'OUTBOUND' | 'TRANSFER' | 'EDIT' | 'MAINTENANCE' | 'RESPONSIVA' | 'DECOMMISSION' | 'REACTIVATE';
+      title: string;
+      description: string;
+      date: string;
+      performedBy: string;
+      meta?: Record<string, any>;
+    }> = [];
+
+    // 1. Initial Creation Event
+    events.push({
+      id: `creation-${item.id}`,
+      type: 'CREATION',
+      title: 'Alta de Activo en Inventario',
+      description: `Registro inicial de "${item.name}" en ${item.plant || 'Planta 2'}${item.area ? ` (Área: ${item.area})` : ''} con SKU ${item.sku}.`,
+      date: item.createdAt.toISOString(),
+      performedBy: 'Sistema / Administrador IT',
+      meta: { sku: item.sku, model: item.model, serialNumber: item.serialNumber }
+    });
+
+    // 2. Transactions
+    item.transactions.forEach((tx) => {
+      let title = 'Movimiento de Inventario';
+      if (tx.type === 'INBOUND') title = `Entrada de Stock (+${tx.quantity})`;
+      else if (tx.type === 'OUTBOUND') title = `Salida de Stock (-${tx.quantity})`;
+      else if (tx.type === 'TRANSFER') title = `Transferencia entre Plantas (${tx.fromPlant || 'Origen'} ➔ ${tx.toPlant || 'Destino'})`;
+      else if (tx.type === 'EDIT') title = 'Modificación de Datos';
+      else if (tx.type === 'DECOMMISSION') title = 'Baja de Activo / Enviado a Scrap';
+      else if (tx.type === 'REACTIVATE') title = 'Reactivación de Activo';
+
+      events.push({
+        id: `tx-${tx.id}`,
+        type: tx.type as any,
+        title,
+        description: tx.notes || (tx.assignedTo ? `Asignado a: ${tx.assignedTo}` : `Cantidad: ${tx.quantity}`),
+        date: tx.createdAt.toISOString(),
+        performedBy: tx.user?.name || tx.user?.username || 'Usuario',
+        meta: { fromPlant: tx.fromPlant, toPlant: tx.toPlant, assignedTo: tx.assignedTo, quantity: tx.quantity }
+      });
+    });
+
+    // 3. Responsivas (Assignments)
+    item.responsivas.forEach((resp) => {
+      events.push({
+        id: `resp-${resp.id}`,
+        type: 'RESPONSIVA',
+        title: `Responsiva Firmada - Asignación a ${resp.colaborador}`,
+        description: `Equipo entregado en custodia a ${resp.colaborador}. Serie: ${resp.serie}. ${resp.observaciones ? `Observaciones: ${resp.observaciones}` : ''}`,
+        date: resp.createdAt.toISOString(),
+        performedBy: 'Departamento IT',
+        meta: { colaborador: resp.colaborador, emailSent: resp.emailSent, responsivaId: resp.id }
+      });
+    });
+
+    // 4. Maintenances
+    item.maintenances.forEach((m) => {
+      events.push({
+        id: `maint-${m.id}`,
+        type: 'MAINTENANCE',
+        title: `Mantenimiento Preventivo (${m.deviceType})`,
+        description: `Servicio técnico completado. Próximo mantenimiento programado para: ${new Date(m.nextDueDate).toLocaleDateString('es-MX')}. ${m.notes ? `Notas: ${m.notes}` : ''}`,
+        date: m.performedAt.toISOString(),
+        performedBy: m.performedBy,
+        meta: { nextDueDate: m.nextDueDate, checklist: m.checklist }
+      });
+    });
+
+    // Sort all events in descending chronological order
+    events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return res.json({ item, events });
+  } catch (error: any) {
+    console.error('Error al obtener la línea de tiempo del artículo:', error);
+    return res.status(500).json({ error: 'Error al consultar la línea de tiempo.' });
   }
 });
 

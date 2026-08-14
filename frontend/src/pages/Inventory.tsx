@@ -6,6 +6,9 @@ import { QRModal } from '../components/QRModal';
 import { ItemEditModal, ItemEditFormData } from '../components/inventory/ItemEditModal';
 import { ItemDetailModal } from '../components/inventory/ItemDetailModal';
 import { ExcelImportModal } from '../components/inventory/ExcelImportModal';
+import { DecommissionModal } from '../components/inventory/DecommissionModal';
+import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
+import { InventoryReportModal } from '../components/inventory/InventoryReportModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -43,7 +46,9 @@ import {
   Tag,
   MapPin as MapPinIcon,
   Calendar,
-  Hash
+  Hash,
+  Clock,
+  RotateCcw
 } from 'lucide-react';
 
 const CATEGORY_MIN_STOCK: Record<string, number> = {
@@ -77,8 +82,10 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPlant, setSelectedPlant] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'DECOMMISSIONED' | 'ALL'>('ACTIVE');
   const [onlyLowStock, setOnlyLowStock] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   // Selected item for QR Modal
   const [selectedQRItem, setSelectedQRItem] = useState<Item | null>(null);
@@ -95,8 +102,11 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
 
   // Modular Modals State
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [viewingItem, setViewingItem] = useState<Item | null>(null);
+  const [timelineItem, setTimelineItem] = useState<Item | null>(null);
+  const [decommissionItem, setDecommissionItem] = useState<Item | null>(null);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -106,6 +116,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       if (searchQuery.trim()) params.q = searchQuery.trim();
       if (selectedCategory) params.category = selectedCategory;
       if (selectedPlant) params.plant = selectedPlant;
+      params.status = statusFilter;
       params.isITInternal = inventoryTab === 'IT' ? 'true' : 'false';
 
       const res = await api.get('/items', { params });
@@ -130,17 +141,30 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedCategory, selectedPlant, onlyLowStock, inventoryTab]);
+  }, [searchQuery, selectedCategory, selectedPlant, statusFilter, onlyLowStock, inventoryTab]);
 
   const handleDeleteItem = async (id: string, name: string) => {
     if (!window.confirm(`¿Está seguro de eliminar el artículo "${name}"?`)) return;
 
     try {
       await api.delete(`/items/${id}`);
+      setActionSuccessMsg(`Artículo "${name}" eliminado correctamente.`);
       fetchItems();
     } catch (err) {
       console.error('Error al eliminar:', err);
       alert('Error al eliminar el artículo.');
+    }
+  };
+
+  const handleReactivateItem = async (item: Item) => {
+    if (!window.confirm(`¿Desea reactivar el activo "${item.name}" al inventario activo?`)) return;
+    try {
+      await api.post(`/items/${item.id}/reactivate`, { newStock: 1 });
+      setActionSuccessMsg(`¡Activo "${item.name}" reactivado correctamente al inventario!`);
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al reactivar:', err);
+      alert(err.response?.data?.error || 'Error al reactivar el activo.');
     }
   };
 
@@ -157,6 +181,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       customAttributes: Object.keys(customAttributesObj).length > 0 ? customAttributesObj : null,
       location: formData.isITInternal ? 'Taller Interno IT' : formData.area
     });
+    setActionSuccessMsg(`Artículo actualizado correctamente.`);
     fetchItems();
   };
 
@@ -255,6 +280,16 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowReportModal(true)}
+            style={{ borderColor: 'var(--coficab-blue-bright)', color: 'var(--coficab-blue-bright)' }}
+            title="Generar reporte para imprimir o exportar a PDF"
+          >
+            <Printer size={18} />
+            Exportar Reporte PDF
+          </button>
+
           {inventoryTab === 'PLANT' && (
             <button className="btn btn-secondary" onClick={() => setShowImportModal(true)} style={{ borderColor: 'var(--border-copper)' }}>
               <FileSpreadsheet size={18} style={{ color: 'var(--coficab-copper)' }} />
@@ -276,6 +311,73 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {inventoryTab === 'IT' ? 'Nuevo Artículo IT' : 'Nuevo Artículo'}
           </button>
         </div>
+      </div>
+
+      {actionSuccessMsg && (
+        <div style={{
+          padding: '1rem 1.25rem',
+          background: 'rgba(16, 185, 129, 0.14)',
+          border: '1px solid rgba(16, 185, 129, 0.35)',
+          borderRadius: 'var(--radius-md)',
+          color: '#34d399',
+          fontSize: '0.95rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontWeight: 600
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <CheckCircle2 size={20} /> {actionSuccessMsg}
+          </div>
+          <button onClick={() => setActionSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#34d399', cursor: 'pointer' }}>
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Status Filter Bar (Activos vs Dados de Baja / Scrap) */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        alignItems: 'center',
+        background: 'rgba(255, 255, 255, 0.03)',
+        padding: '0.4rem 0.6rem',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border-color)',
+        marginBottom: '1.5rem',
+        flexWrap: 'wrap'
+      }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginLeft: '0.4rem', marginRight: '0.4rem' }}>
+          ESTADO DE ACTIVOS:
+        </span>
+        <button
+          className={`btn ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setStatusFilter('ACTIVE')}
+          style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}
+        >
+          🟢 Inventario Activo (En Servicio / Stock)
+        </button>
+        <button
+          className={`btn ${statusFilter === 'DECOMMISSIONED' ? 'btn-danger' : 'btn-secondary'}`}
+          onClick={() => setStatusFilter('DECOMMISSIONED')}
+          style={{
+            padding: '0.35rem 0.85rem',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            borderColor: statusFilter === 'DECOMMISSIONED' ? '#ef4444' : undefined,
+            color: statusFilter === 'DECOMMISSIONED' ? '#ffffff' : '#f87171'
+          }}
+        >
+          🗑️ Historial Dados de Baja / Scrap (Basura)
+        </button>
+        <button
+          className={`btn ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setStatusFilter('ALL')}
+          style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}
+        >
+          📋 Todos los Registros
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -647,7 +749,16 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     </div>
                                   </td>
                                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                                    <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                                    <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                                      <button
+                                        className="btn btn-secondary"
+                                        onClick={() => setTimelineItem(item)}
+                                        title="Ver Línea del Tiempo del Ciclo de Vida"
+                                        style={{ padding: '0.35rem 0.55rem' }}
+                                      >
+                                        <Clock size={15} style={{ color: 'var(--coficab-blue-bright)' }} />
+                                      </button>
+
                                       <button
                                         className="btn btn-secondary"
                                         onClick={() => setViewingItem(item)}
@@ -656,6 +767,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                       >
                                         <Eye size={15} />
                                       </button>
+
                                       {isAdmin && (
                                         <>
                                           <button
@@ -666,13 +778,34 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                           >
                                             <Edit size={15} />
                                           </button>
+
+                                          {item.status !== 'DECOMMISSIONED' ? (
+                                            <button
+                                              className="btn btn-secondary"
+                                              onClick={() => setDecommissionItem(item)}
+                                              title="Dar de baja / Enviar a Scrap"
+                                              style={{ padding: '0.35rem 0.55rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                                            >
+                                              <Trash2 size={15} />
+                                            </button>
+                                          ) : (
+                                            <button
+                                              className="btn btn-success"
+                                              onClick={() => handleReactivateItem(item)}
+                                              title="Reactivar activo al inventario"
+                                              style={{ padding: '0.35rem 0.55rem' }}
+                                            >
+                                              <RotateCcw size={15} />
+                                            </button>
+                                          )}
+
                                           <button
                                             className="btn btn-danger"
                                             onClick={() => handleDeleteItem(item.id, item.name)}
-                                            title="Eliminar artículo"
+                                            title="Eliminar artículo permanentemente"
                                             style={{ padding: '0.35rem 0.55rem' }}
                                           >
-                                            <Trash2 size={15} />
+                                            <X size={15} />
                                           </button>
                                         </>
                                       )}
@@ -701,6 +834,22 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         />
       )}
 
+      {/* Inventory Printable / PDF Report Modal */}
+      {showReportModal && (
+        <InventoryReportModal
+          items={items}
+          totalCount={items.length}
+          filters={{
+            category: selectedCategory,
+            plant: selectedPlant,
+            searchQuery,
+            isITInternal: inventoryTab === 'IT',
+            status: statusFilter
+          }}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
+
       {/* Item Detail Modal */}
       {viewingItem && (
         <ItemDetailModal
@@ -711,6 +860,39 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             setViewingItem(null);
             setEditingItem(item);
           }}
+          onOpenTimeline={(item) => {
+            setViewingItem(null);
+            setTimelineItem(item);
+          }}
+          onOpenDecommission={(item) => {
+            setViewingItem(null);
+            setDecommissionItem(item);
+          }}
+          onReactivate={(item) => {
+            setViewingItem(null);
+            handleReactivateItem(item);
+          }}
+        />
+      )}
+
+      {/* Decommission Modal */}
+      {decommissionItem && (
+        <DecommissionModal
+          item={decommissionItem}
+          onClose={() => setDecommissionItem(null)}
+          onSuccess={(updated, msg) => {
+            setDecommissionItem(null);
+            setActionSuccessMsg(msg);
+            fetchItems();
+          }}
+        />
+      )}
+
+      {/* Asset Lifecycle Timeline Modal */}
+      {timelineItem && (
+        <AssetTimelineModal
+          item={timelineItem}
+          onClose={() => setTimelineItem(null)}
         />
       )}
 

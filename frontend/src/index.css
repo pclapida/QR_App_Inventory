@@ -459,3 +459,61 @@ body {
   border-top-color: rgba(255, 255, 255, 0.45);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 12px 24px -4px rgba(0, 0, 0, 0.6);
 }
+
+/* =========================================================
+   Print Styles for Official Executive Reports
+   ========================================================= */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+  }
+
+  .navbar,
+  .no-print,
+  .btn,
+  .modal-overlay:not(:has(#printable-inventory-area)) {
+    display: none !important;
+  }
+
+  .modal-overlay:has(#printable-inventory-area) {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .printable-report-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  #printable-inventory-area {
+    padding: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  @page {
+    size: landscape;
+    margin: 1cm;
+  }
+}

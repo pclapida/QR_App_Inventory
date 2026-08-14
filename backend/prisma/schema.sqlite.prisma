@@ -43,17 +43,25 @@ model Item {
   customAttributes   String?
   bitlockerKey       String?
   devicePassword     String?
-  assignedTo         String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  transactions       Transaction[]
-  maintenances       Maintenance[]
-  responsivas        ResponsivaHistory[]
+  assignedTo            String?
+  status                String        @default("ACTIVE")
+  decommissionDate      DateTime?
+  decommissionReason    String?
+  decommissionNotes     String?
+  decommissionedBy      String?
+  disposalMethod        String?
+  decommissionActNumber String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  transactions          Transaction[]
+  maintenances          Maintenance[]
+  responsivas           ResponsivaHistory[]
 
   @@index([plant, category])
   @@index([isITInternal])
   @@index([assignedTo])
   @@index([serialNumber])
+  @@index([status])
 }
 
 model Transaction {
