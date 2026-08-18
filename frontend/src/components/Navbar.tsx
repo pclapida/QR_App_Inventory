@@ -127,109 +127,51 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="nav-links desktop-nav-links" style={{ gap: '0.6rem' }}>
+        <nav className="nav-links desktop-nav-links" style={{ gap: '0.45rem' }}>
           <NavLink
             to="/inventory"
             className={() => `nav-item ${location.pathname === '/inventory' || location.pathname === '/inventory-it' || location.pathname === '/loans' ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.85rem', fontSize: '0.88rem' }}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
           >
-            <Package size={17} />
+            <Package size={16} />
             Inventario
+          </NavLink>
+
+          <NavLink
+            to="/maintenance"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
+          >
+            <Wrench size={16} style={{ color: '#f59e0b' }} />
+            Mantenimiento
+          </NavLink>
+
+          <NavLink
+            to="/purchase-orders"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
+          >
+            <ClipboardList size={16} style={{ color: 'var(--coficab-blue-bright)' }} />
+            Requisiciones
+          </NavLink>
+
+          <NavLink
+            to="/responsivas-history"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
+          >
+            <FileText size={16} style={{ color: 'var(--coficab-copper)' }} />
+            Responsivas
           </NavLink>
 
           <NavLink
             to="/scanner"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.85rem', fontSize: '0.88rem' }}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
           >
-            <Scan size={17} />
+            <Scan size={16} />
             Escanear
           </NavLink>
-
-          {/* Operations Dropdown Menu */}
-          <div ref={opsDropdownRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              className={`nav-item ${isOpsActive ? 'active' : ''}`}
-              onClick={() => setOpsDropdownOpen(!opsDropdownOpen)}
-              style={{
-                background: opsDropdownOpen ? 'var(--bg-card-hover)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0.45rem 0.75rem',
-                fontSize: '0.86rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}
-            >
-              <Layers size={17} style={{ color: isOpsActive ? 'var(--primary)' : 'var(--text-muted)' }} />
-              <span>Operaciones</span>
-              <ChevronDown size={14} style={{ transform: opsDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
-            </button>
-
-            {opsDropdownOpen && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                left: 0,
-                minWidth: '230px',
-                background: 'var(--bg-card)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-highlight)',
-                boxShadow: '0 12px 28px rgba(0,0,0,0.4)',
-                backdropFilter: 'blur(16px)',
-                zIndex: 1000,
-                padding: '0.4rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.2rem',
-                animation: 'fadeIn 0.15s ease'
-              }}>
-                <NavLink
-                  to="/maintenance"
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => setOpsDropdownOpen(false)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
-                >
-                  <Wrench size={16} style={{ color: '#f59e0b' }} />
-                  Mantenimiento Preventivo
-                </NavLink>
-
-                <NavLink
-                  to="/purchase-orders"
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => setOpsDropdownOpen(false)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
-                >
-                  <ClipboardList size={16} style={{ color: 'var(--coficab-blue-bright)' }} />
-                  Requisiciones / Compras
-                </NavLink>
-
-                <NavLink
-                  to="/responsivas-history"
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => setOpsDropdownOpen(false)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
-                >
-                  <FileText size={16} style={{ color: 'var(--coficab-copper)' }} />
-                  Historial de Responsivas
-                </NavLink>
-
-                {isAdmin && (
-                  <NavLink
-                    to="/add-item"
-                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                    onClick={() => setOpsDropdownOpen(false)}
-                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', borderTop: '1px solid var(--border-color)', marginTop: '0.2rem', paddingTop: '0.5rem' }}
-                  >
-                    <PlusCircle size={16} style={{ color: 'var(--primary)' }} />
-                    Registrar Nuevo Activo
-                  </NavLink>
-                )}
-              </div>
-            )}
-          </div>
         </nav>
 
         {/* Desktop User & Theme Controls */}
