@@ -44,10 +44,11 @@ import {
   Truck,
   AlertCircle,
   Undo2,
-  Info
+  Info,
+  CheckSquare
 } from 'lucide-react';
 
-export type InventoryTabType = 'ASSIGNED' | 'AVAILABLE' | 'LOANS' | 'SCRAP' | 'TRANSFERS';
+export type InventoryTabType = 'ASSIGNED' | 'AVAILABLE' | 'LOANS' | 'SCRAP' | 'TRANSFERS' | 'DAMAGED';
 
 interface InventoryProps {
   mode?: 'PLANT' | 'IT';
@@ -59,13 +60,14 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
-  // 5 Tabs: ASSIGNED, AVAILABLE, LOANS, SCRAP, TRANSFERS
+  // 6 Tabs: ASSIGNED, AVAILABLE, LOANS, SCRAP, TRANSFERS, DAMAGED
   const [activeTab, setActiveTab] = useState<InventoryTabType>(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'available' || mode === 'IT') return 'AVAILABLE';
     if (tabParam === 'loans') return 'LOANS';
     if (tabParam === 'scrap') return 'SCRAP';
     if (tabParam === 'transfers') return 'TRANSFERS';
+    if (tabParam === 'damaged') return 'DAMAGED';
     return 'ASSIGNED';
   });
 
@@ -90,6 +92,12 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [permanentDeleteItem, setPermanentDeleteItem] = useState<Item | null>(null);
   const [thermalItems, setThermalItems] = useState<Item[] | null>(null);
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
+
+  // Report Fault / Damage Modal state
+  const [faultReportItem, setFaultReportItem] = useState<Item | null>(null);
+  const [faultDescription, setFaultDescription] = useState<string>('');
+  const [faultNotes, setFaultNotes] = useState<string>('');
+  const [submittingFault, setSubmittingFault] = useState<boolean>(false);
 
   // Transfer modal state
   const [targetPlant, setTargetPlant] = useState<string>('Planta UPCAST');
@@ -179,6 +187,44 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     } catch (err: any) {
       console.error('Error al desasignar:', err);
       alert(err.response?.data?.error || 'Error al devolver el equipo al inventario disponible.');
+    }
+  };
+
+  // Handle Report Fault
+  const handleExecuteReportFault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!faultReportItem || !faultDescription.trim()) return;
+    setSubmittingFault(true);
+    try {
+      await itemsApi.reportFault(faultReportItem.id, {
+        faults: faultDescription.trim(),
+        notes: faultNotes.trim() || undefined
+      });
+      setActionSuccessMsg(`Falla registrada para "${faultReportItem.name}". Trasladado a la pestaña Dañados.`);
+      setFaultReportItem(null);
+      setFaultDescription('');
+      setFaultNotes('');
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al reportar daño:', err);
+      alert(err.response?.data?.error || 'Error al reportar daño.');
+    } finally {
+      setSubmittingFault(false);
+    }
+  };
+
+  // Handle Repair / Mark Resolved (Returns item to Disponible)
+  const handleRepairItem = async (item: Item) => {
+    const notes = window.prompt(`¿Desea marcar como reparado el activo "${item.name}" y retornarlo al Inventario Disponible de IT?\n\n(Opcional) Ingrese observaciones de la reparación:`, 'Reparación completada / Mantenimiento correctivo aplicado');
+    if (notes === null) return;
+
+    try {
+      await itemsApi.repair(item.id, { notes });
+      setActionSuccessMsg(`¡Activo "${item.name}" reparado exitosamente y devuelto a Disponible!`);
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al reparar equipo:', err);
+      alert(err.response?.data?.error || 'Error al procesar la reparación.');
     }
   };
 
@@ -362,7 +408,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         </div>
       )}
 
-      {/* 5-TAB NAVIGATION BAR */}
+      {/* 6-TAB NAVIGATION BAR */}
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
@@ -382,24 +428,24 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
           style={{
             flex: '1 1 auto',
-            minWidth: '140px',
-            padding: '0.65rem 1rem',
+            minWidth: '130px',
+            padding: '0.65rem 0.9rem',
             borderRadius: 'var(--radius-md)',
             border: 'none',
             background: activeTab === 'ASSIGNED' ? 'var(--primary)' : 'transparent',
             color: activeTab === 'ASSIGNED' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: activeTab === 'ASSIGNED' ? 800 : 600,
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             transition: 'all 0.15s ease',
             boxShadow: activeTab === 'ASSIGNED' ? '0 4px 12px rgba(0, 43, 144, 0.4)' : 'none'
           }}
         >
-          <Package size={17} />
+          <Package size={16} />
           <span>1. Asignado</span>
         </button>
 
@@ -412,24 +458,24 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
           style={{
             flex: '1 1 auto',
-            minWidth: '140px',
-            padding: '0.65rem 1rem',
+            minWidth: '130px',
+            padding: '0.65rem 0.9rem',
             borderRadius: 'var(--radius-md)',
             border: 'none',
             background: activeTab === 'AVAILABLE' ? 'var(--coficab-copper)' : 'transparent',
             color: activeTab === 'AVAILABLE' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: activeTab === 'AVAILABLE' ? 800 : 600,
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             transition: 'all 0.15s ease',
             boxShadow: activeTab === 'AVAILABLE' ? '0 4px 12px rgba(201, 138, 75, 0.4)' : 'none'
           }}
         >
-          <Laptop size={17} />
+          <Laptop size={16} />
           <span>2. Disponible (IT)</span>
         </button>
 
@@ -442,24 +488,24 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
           style={{
             flex: '1 1 auto',
-            minWidth: '130px',
-            padding: '0.65rem 1rem',
+            minWidth: '120px',
+            padding: '0.65rem 0.9rem',
             borderRadius: 'var(--radius-md)',
             border: 'none',
             background: activeTab === 'LOANS' ? '#6366f1' : 'transparent',
             color: activeTab === 'LOANS' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: activeTab === 'LOANS' ? 800 : 600,
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             transition: 'all 0.15s ease',
             boxShadow: activeTab === 'LOANS' ? '0 4px 12px rgba(99, 102, 241, 0.4)' : 'none'
           }}
         >
-          <ArrowRightLeft size={17} />
+          <ArrowRightLeft size={16} />
           <span>3. Préstamos</span>
         </button>
 
@@ -472,24 +518,24 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
           style={{
             flex: '1 1 auto',
-            minWidth: '130px',
-            padding: '0.65rem 1rem',
+            minWidth: '120px',
+            padding: '0.65rem 0.9rem',
             borderRadius: 'var(--radius-md)',
             border: 'none',
             background: activeTab === 'SCRAP' ? '#f43f5e' : 'transparent',
             color: activeTab === 'SCRAP' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: activeTab === 'SCRAP' ? 800 : 600,
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             transition: 'all 0.15s ease',
             boxShadow: activeTab === 'SCRAP' ? '0 4px 12px rgba(244, 63, 94, 0.4)' : 'none'
           }}
         >
-          <Trash2 size={17} />
+          <Trash2 size={16} />
           <span>4. Bajas / Scrap</span>
         </button>
 
@@ -502,25 +548,55 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
           style={{
             flex: '1 1 auto',
-            minWidth: '130px',
-            padding: '0.65rem 1rem',
+            minWidth: '120px',
+            padding: '0.65rem 0.9rem',
             borderRadius: 'var(--radius-md)',
             border: 'none',
             background: activeTab === 'TRANSFERS' ? '#0ea5e9' : 'transparent',
             color: activeTab === 'TRANSFERS' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: activeTab === 'TRANSFERS' ? 800 : 600,
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             transition: 'all 0.15s ease',
             boxShadow: activeTab === 'TRANSFERS' ? '0 4px 12px rgba(14, 165, 233, 0.4)' : 'none'
           }}
         >
-          <Truck size={17} />
+          <Truck size={16} />
           <span>5. Transferencias</span>
+        </button>
+
+        {/* Tab 6: Dañado */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('DAMAGED');
+            setSearchParams({ tab: 'damaged' });
+          }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '120px',
+            padding: '0.65rem 0.9rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'DAMAGED' ? '#f59e0b' : 'transparent',
+            color: activeTab === 'DAMAGED' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'DAMAGED' ? 800 : 600,
+            fontSize: '0.88rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'DAMAGED' ? '0 4px 12px rgba(245, 158, 11, 0.4)' : 'none'
+          }}
+        >
+          <AlertTriangle size={16} />
+          <span>6. Dañado</span>
         </button>
       </div>
 
@@ -533,6 +609,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {activeTab === 'LOANS' && <><ArrowRightLeft style={{ color: '#6366f1' }} /> Préstamos Temporales de IT</>}
             {activeTab === 'SCRAP' && <><Trash2 style={{ color: '#f43f5e' }} /> Bajas de Activos & Scrap</>}
             {activeTab === 'TRANSFERS' && <><Truck style={{ color: '#0ea5e9' }} /> Transferencias de Planta (Planta 2 / UPCAST)</>}
+            {activeTab === 'DAMAGED' && <><AlertTriangle style={{ color: '#f59e0b' }} /> Equipos Dañados & Con Fallas</>}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
             {activeTab === 'ASSIGNED' && 'Equipos operativos entregados y asignados formalmente a colaboradores o departamentos.'}
@@ -540,6 +617,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {activeTab === 'LOANS' && 'Control de préstamos temporales de laptops, proyectores y accesorios con fecha de devolución.'}
             {activeTab === 'SCRAP' && 'Histórico de equipos desincorporados por daño, obsolescencia o disposición E-Waste.'}
             {activeTab === 'TRANSFERS' && 'Equipos ubicados físicamente en Planta 2 o Planta UPCAST con trazabilidad de origen.'}
+            {activeTab === 'DAMAGED' && 'Equipos reportados con fallas técnicas o daños físicos en espera de reparación o dictamen técnico.'}
           </p>
         </div>
 
@@ -610,6 +688,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               {activeTab === 'LOANS' && 'Préstamos Totales'}
               {activeTab === 'SCRAP' && 'Activos en Bajas/Scrap'}
               {activeTab === 'TRANSFERS' && 'Equipos Transferidos'}
+              {activeTab === 'DAMAGED' && 'Equipos con Daño / Falla'}
             </span>
             <Package size={19} style={{ color: 'var(--primary)' }} />
           </div>
@@ -686,6 +765,18 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             </div>
           </div>
         )}
+
+        {activeTab === 'DAMAGED' && (
+          <div className="glass-panel" style={{ padding: '1.1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              <span>Atención Prioritaria</span>
+              <Wrench size={19} style={{ color: '#f59e0b' }} />
+            </div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#f59e0b', marginTop: '0.2rem' }}>
+              {items.length}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SEARCH AND FILTERS BAR */}
@@ -695,7 +786,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           <input
             type="text"
             className="form-input"
-            placeholder={activeTab === 'LOANS' ? 'Buscar por solicitante, área, nómina o equipo...' : 'Buscar por nombre, SKU, modelo, serie, responsable, IP...'}
+            placeholder={activeTab === 'LOANS' ? 'Buscar por solicitante, área, nómina o equipo...' : 'Buscar por nombre, SKU, modelo, serie, responsable, falla...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ paddingLeft: '2.5rem' }}
@@ -851,7 +942,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         </div>
       ) : (
         /* ========================================================================= */
-        /* TABS 1, 2, 4, 5: ITEM TABLES ACCORDION                                    */
+        /* TABS 1, 2, 4, 5, 6: ITEM TABLES ACCORDION                                 */
         /* ========================================================================= */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {Object.keys(groupedItems).length === 0 ? (
@@ -865,6 +956,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                 {activeTab === 'ASSIGNED' && 'No hay equipos asignados actualmente.'}
                 {activeTab === 'SCRAP' && 'No hay equipos dados de baja o en scrap.'}
                 {activeTab === 'TRANSFERS' && 'No hay equipos transferidos entre plantas.'}
+                {activeTab === 'DAMAGED' && '¡Excelente! No hay equipos reportados con daños o fallas en este momento.'}
               </p>
             </div>
           ) : (
@@ -931,7 +1023,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                             <th style={{ padding: '0.75rem 1rem' }}>Artículo / SKU</th>
                             <th style={{ padding: '0.75rem 1rem' }}>Modelo & Serie</th>
                             <th style={{ padding: '0.75rem 1rem' }}>
-                              {activeTab === 'ASSIGNED' ? 'Colaborador Asignado' : activeTab === 'TRANSFERS' ? 'Ubicación vs Origen' : activeTab === 'SCRAP' ? 'Motivo de Baja' : 'Stock'}
+                              {activeTab === 'ASSIGNED' ? 'Colaborador Asignado' : activeTab === 'TRANSFERS' ? 'Ubicación vs Origen' : activeTab === 'SCRAP' ? 'Motivo de Baja' : activeTab === 'DAMAGED' ? 'Falla / Daño Reportado' : 'Stock'}
                             </th>
                             <th style={{ padding: '0.75rem 1rem' }}>Planta / Área</th>
                             <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
@@ -1014,6 +1106,13 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     </div>
                                   </div>
                                 )}
+                                {activeTab === 'DAMAGED' && (
+                                  <div>
+                                    <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.18)', color: '#f59e0b', borderColor: '#f59e0b' }}>
+                                      ⚠️ {item.faults || 'Falla / Daño reportado'}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
 
                               {/* Plant / Location */}
@@ -1053,6 +1152,36 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                       style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--coficab-copper)' }}
                                     >
                                       <Undo2 size={14} /> Devolver
+                                    </button>
+                                  )}
+
+                                  {/* Action: Report Fault (AVAILABLE & ASSIGNED tabs) */}
+                                  {(activeTab === 'AVAILABLE' || activeTab === 'ASSIGNED') && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => {
+                                        setFaultReportItem(item);
+                                        setFaultDescription('');
+                                        setFaultNotes('');
+                                      }}
+                                      title="Reportar Daño o Falla Técnica"
+                                      style={{ padding: '0.35rem 0.55rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+                                    >
+                                      <AlertTriangle size={14} />
+                                    </button>
+                                  )}
+
+                                  {/* Action: Repair / Return to Disponible (DAMAGED tab) */}
+                                  {activeTab === 'DAMAGED' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => handleRepairItem(item)}
+                                      title="Marcar como reparado y regresar al Inventario Disponible"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)', fontWeight: 700 }}
+                                    >
+                                      <CheckSquare size={14} /> Reparado
                                     </button>
                                   )}
 
@@ -1109,7 +1238,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     </button>
                                   )}
 
-                                  {/* Action: Decommission / Scrap (In AVAILABLE, ASSIGNED, TRANSFERS) */}
+                                  {/* Action: Decommission / Scrap (In AVAILABLE, ASSIGNED, TRANSFERS, DAMAGED) */}
                                   {isAdmin && activeTab !== 'SCRAP' && (
                                     <button
                                       type="button"
@@ -1486,6 +1615,61 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={returningLoan} style={{ background: '#10b981', fontWeight: 700 }}>
                   {returningLoan ? 'Guardando...' : 'Confirmar Devolución'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 13. Report Fault / Damage Modal */}
+      {faultReportItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px', borderColor: '#f59e0b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <AlertTriangle size={20} style={{ color: '#f59e0b' }} /> Reportar Falla o Daño de Equipo
+              </h3>
+              <button onClick={() => setFaultReportItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteReportFault}>
+              <div style={{ padding: '0.85rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{faultReportItem.name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--coficab-copper)', marginTop: '0.15rem' }}>SKU: {faultReportItem.sku} | S/N: {faultReportItem.serialNumber || 'N/A'}</div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label" style={{ color: '#f59e0b', fontWeight: 800 }}>Descripción del Daño / Falla *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="ej. Pantalla estrellada, no enciende, teclado dañado..."
+                  value={faultDescription}
+                  onChange={(e) => setFaultDescription(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Detalles u Observaciones Adicionales</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  placeholder="ej. Ocurrió por caída en piso de producción..."
+                  value={faultNotes}
+                  onChange={(e) => setFaultNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setFaultReportItem(null)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingFault} style={{ background: '#f59e0b', borderColor: '#f59e0b', fontWeight: 700 }}>
+                  {submittingFault ? 'Registrando...' : 'Registrar Falla'}
                 </button>
               </div>
             </form>

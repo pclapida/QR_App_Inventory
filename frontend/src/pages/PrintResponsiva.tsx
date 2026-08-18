@@ -213,28 +213,26 @@ export const PrintResponsiva: React.FC = () => {
             Fecha de entrega: <u>&nbsp;&nbsp;{today.getDate().toString().padStart(2, '0')}&nbsp;&nbsp;</u> / <u>&nbsp;&nbsp;{(today.getMonth() + 1).toString().padStart(2, '0')}&nbsp;&nbsp;</u> / <u>&nbsp;&nbsp;{today.getFullYear()}&nbsp;&nbsp;</u>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '40px' }}>
-            <div className="signature-box" style={{ position: 'relative', minHeight: '80px' }}>
-              {data.signatureData ? (
-                <div style={{ marginBottom: '5px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '2.5rem', marginTop: '30px' }}>
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ height: 75, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: 2 }}>
+                {data.signatureData ? (
                   <img
                     src={data.signatureData}
-                    alt="Firma Digital"
-                    style={{ maxHeight: '60px', maxWidth: '200px', display: 'block', margin: '0 auto' }}
+                    alt="Firma del colaborador"
+                    style={{ maxHeight: '70px', maxWidth: '220px', objectFit: 'contain' }}
                   />
-                  <small style={{ fontSize: '7pt', color: '#666', display: 'block' }}>
-                    🔒 Firmado digitalmente en dispositivo COFICAB
-                  </small>
-                </div>
-              ) : (
-                <br/>
-              )}
-              <strong>Firma del colaborador</strong><br/>
-              {data.colaborador}
+                ) : (
+                  <div style={{ height: 70 }}></div>
+                )}
+              </div>
+              <div style={{ width: '100%', borderTop: '1px solid #000', marginBottom: 6 }}></div>
+              <strong>Firma del colaborador</strong>
+              <span style={{ fontSize: '10pt', marginTop: 2 }}>{data.colaborador}</span>
             </div>
-            <div className="signature-box" style={{ minHeight: '80px' }}>
-              <br/>
-              <br/>
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ height: 75, width: '100%', marginBottom: 2 }}></div>
+              <div style={{ width: '100%', borderTop: '1px solid #000', marginBottom: 6 }}></div>
               <strong>Nombre y firma del responsable de TI</strong>
             </div>
           </div>

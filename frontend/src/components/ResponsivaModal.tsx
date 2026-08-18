@@ -90,8 +90,11 @@ export async function openPrintWindow(item: Item, data: ResponsivaData) {
   .data-table td { padding: 5px 0; vertical-align: top; }
   .data-table td:first-child { font-weight: bold; width: 35%; }
   .data-table td:last-child { border-bottom: 1px solid #000; padding-left: 8px; }
-  .sig-row { display: flex; justify-content: space-around; margin-top: 60px; gap: 2rem; }
-  .sig-box { flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 6px; }
+  .sig-row { display: flex; justify-content: space-around; margin-top: 30px; gap: 2.5rem; page-break-inside: avoid; }
+  .sig-col { flex: 1; text-align: center; }
+  .sig-img-container { height: 75px; display: flex; align-items: flex-end; justify-content: center; width: 100%; margin-bottom: 2px; }
+  .sig-img-container img { max-height: 70px; max-width: 220px; object-fit: contain; }
+  .sig-line { width: 100%; border-top: 1px solid #000; margin-bottom: 6px; }
   @media print { @page { margin: 1.5cm; size: letter; } body { padding: 0; } }
 </style>
 </head>
@@ -210,7 +213,7 @@ export async function openPrintWindow(item: Item, data: ResponsivaData) {
 
 ${photosHtml}
 
-<p style="font-weight:bold;margin-bottom:30px;">
+<p style="font-weight:bold;margin-bottom:20px;">
   Fecha de entrega:&nbsp;
   <u>&nbsp;${today.getDate().toString().padStart(2,'0')}&nbsp;</u> /
   <u>&nbsp;${(today.getMonth()+1).toString().padStart(2,'0')}&nbsp;</u> /
@@ -220,12 +223,19 @@ ${photosHtml}
 
 <div class="sig-block">
 <div class="sig-row">
-  <div class="sig-box">
+  <div class="sig-col">
+    <div class="sig-img-container">
+      ${data.signatureData ? `<img src="${data.signatureData}" alt="Firma del colaborador" />` : ''}
+    </div>
+    <div class="sig-line"></div>
     <strong>Firma del colaborador</strong><br>
-    ${data.signatureData ? `<img src="${data.signatureData}" style="max-height:55px;display:block;margin:4px auto;" /><small style="font-size:7pt;color:#555;">🔒 Firmado digitalmente</small><br/>` : ''}
     ${data.colaborador}
   </div>
-  <div class="sig-box"><strong>Nombre y firma del responsable de TI</strong></div>
+  <div class="sig-col">
+    <div class="sig-img-container"></div>
+    <div class="sig-line"></div>
+    <strong>Nombre y firma del responsable de TI</strong>
+  </div>
 </div>
 </div>
 
@@ -381,22 +391,26 @@ const DocumentPreview: React.FC<{
             </div>
           )}
 
-          <div style={{ fontWeight: 'bold', marginBottom: 50 }}>
+          <div style={{ fontWeight: 'bold', marginBottom: 25 }}>
             Fecha de entrega: <u>&nbsp;{today.getDate().toString().padStart(2,'0')}&nbsp;</u> / <u>&nbsp;{(today.getMonth()+1).toString().padStart(2,'0')}&nbsp;</u> / <u>&nbsp;{today.getFullYear()}&nbsp;</u>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '2rem', marginTop: 40 }}>
-            <div style={{ textAlign: 'center', flex: 1, borderTop: '1px solid #000', paddingTop: 6 }}>
-              {data.signatureData && (
-                <div style={{ marginBottom: 6 }}>
-                  <img src={data.signatureData} alt="Firma digital" style={{ maxHeight: 50, maxWidth: 180, display: 'block', margin: '0 auto' }} />
-                  <small style={{ fontSize: '7pt', color: '#555', display: 'block' }}>🔒 Firmado digitalmente</small>
-                </div>
-              )}
-              <strong>Firma del colaborador</strong><br/><span style={{ fontSize: '10pt' }}>{data.colaborador}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '2.5rem', marginTop: 25 }}>
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ height: 75, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: 2 }}>
+                {data.signatureData ? (
+                  <img src={data.signatureData} alt="Firma del colaborador" style={{ maxHeight: 70, maxWidth: 220, objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ height: 70 }}></div>
+                )}
+              </div>
+              <div style={{ width: '100%', borderTop: '1px solid #000', marginBottom: 6 }}></div>
+              <strong>Firma del colaborador</strong>
+              <span style={{ fontSize: '10pt', marginTop: 2 }}>{data.colaborador}</span>
             </div>
-            <div style={{ textAlign: 'center', flex: 1, borderTop: '1px solid #000', paddingTop: 6 }}>
-              <br/>
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ height: 75, width: '100%', marginBottom: 2 }}></div>
+              <div style={{ width: '100%', borderTop: '1px solid #000', marginBottom: 6 }}></div>
               <strong>Nombre y firma del responsable de TI</strong>
             </div>
           </div>

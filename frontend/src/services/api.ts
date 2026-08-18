@@ -161,6 +161,14 @@ export const itemsApi = {
     const res = await api.post(`/items/${id}/transfer`, data);
     return res.data as { message: string; item: Item };
   },
+  reportFault: async (id: string, data: { faults: string; notes?: string }) => {
+    const res = await api.post(`/items/${id}/report-fault`, data);
+    return res.data as { message: string; item: Item };
+  },
+  repair: async (id: string, data?: { notes?: string }) => {
+    const res = await api.post(`/items/${id}/repair`, data || {});
+    return res.data as { message: string; item: Item };
+  },
   deletePermanent: async (id: string) => {
     const res = await api.delete(`/items/${id}`);
     return res.data as { message: string };

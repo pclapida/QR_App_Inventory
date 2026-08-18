@@ -25,7 +25,8 @@ import {
   Clock,
   Layers,
   Trash2,
-  Truck
+  Truck,
+  AlertTriangle
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -173,6 +174,16 @@ export const Navbar: React.FC = () => {
           >
             <Truck size={16} />
             Transferencias
+          </NavLink>
+
+          <NavLink
+            to="/inventory?tab=damaged"
+            className={() => `nav-item ${location.search.includes('tab=damaged') ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', color: '#f59e0b' }}
+            title="Equipos Dañados y Con Fallas"
+          >
+            <AlertTriangle size={16} />
+            Dañado
           </NavLink>
 
           <NavLink
@@ -473,6 +484,15 @@ export const Navbar: React.FC = () => {
                   >
                     <Truck size={19} style={{ color: '#0ea5e9' }} />
                     <span>5. Transferencias (Planta 2/UPCAST)</span>
+                  </NavLink>
+
+                  <NavLink
+                    to="/inventory?tab=damaged"
+                    className={() => `drawer-nav-item ${location.search.includes('tab=damaged') ? 'active' : ''}`}
+                    onClick={() => setMobileDrawerOpen(false)}
+                  >
+                    <AlertTriangle size={19} style={{ color: '#f59e0b' }} />
+                    <span>6. Dañado / Con Fallas</span>
                   </NavLink>
 
                   <NavLink

@@ -185,7 +185,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
     const { q, category, plant, isITInternal, status, tab, page, limit } = req.query;
     const whereClause: any = {};
 
-    // Tab-based filtering for the 5-state lifecycle
+    // Tab-based filtering for the 6-state lifecycle
     if (tab === 'ASSIGNED') {
       whereClause.status = 'ACTIVE';
       whereClause.isITInternal = false;
@@ -194,6 +194,9 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
       whereClause.isITInternal = true;
     } else if (tab === 'SCRAP') {
       whereClause.status = 'DECOMMISSIONED';
+    } else if (tab === 'DAMAGED') {
+      whereClause.status = 'ACTIVE';
+      whereClause.faults = { not: null };
     } else if (tab === 'TRANSFERS') {
       whereClause.status = 'ACTIVE';
       whereClause.OR = [
@@ -642,6 +645,97 @@ router.post('/:id/unassign', requireAdmin, async (req: AuthenticatedRequest, res
   } catch (error: any) {
     console.error('Error al desasignar artículo:', error);
     return res.status(500).json({ error: 'Error al devolver el artículo al inventario disponible.' });
+  }
+});
+
+// POST /api/items/:id/report-fault - Mark an item as damaged with fault description
+router.post('/:id/report-fault', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { faults, notes } = req.body;
+
+    if (!faults || !faults.trim()) {
+      return res.status(400).json({ error: 'Debe especificar el motivo o descripción del daño / falla.' });
+    }
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          faults: faults.trim(),
+          notes: notes ? (item.notes ? `${item.notes}\n[Falla Reportada]: ${notes.trim()}` : `[Falla Reportada]: ${notes.trim()}`) : item.notes
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'FALLA_REPORTADA',
+          quantity: 1,
+          fromPlant: item.plant,
+          toPlant: item.plant,
+          notes: `Falla/Daño reportado: "${faults.trim()}". ${notes ? `Notas: ${notes.trim()}` : ''}`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ message: `Falla registrada. El equipo se encuentra en el apartado de Dañados.`, item: updatedItem });
+  } catch (error: any) {
+    console.error('Error al reportar falla:', error);
+    return res.status(500).json({ error: 'Error al registrar la falla del equipo.' });
+  }
+});
+
+// POST /api/items/:id/repair - Mark a damaged item as repaired/resolved and return to IT Available
+router.post('/:id/repair', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const previousFault = item.faults || 'Falla técnica';
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          faults: null,
+          isITInternal: true,
+          location: 'Taller Interno IT'
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'REPARACIÓN_COMPLETADA',
+          quantity: 1,
+          fromPlant: item.plant,
+          toPlant: item.plant,
+          notes: `Equipo reparado (Falla previa: "${previousFault}"). Retornado a Inventario Disponible de IT. ${notes ? `Detalles: ${notes.trim()}` : ''}`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ message: `Equipo marcado como reparado y retornado al Inventario Disponible de IT.`, item: updatedItem });
+  } catch (error: any) {
+    console.error('Error al marcar como reparado:', error);
+    return res.status(500).json({ error: 'Error al procesar la reparación del equipo.' });
   }
 });
 
