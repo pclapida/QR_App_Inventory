@@ -165,63 +165,57 @@ export const Navbar: React.FC = () => {
               to="/admin"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               style={{ color: '#c084fc' }}
+              title="Panel de Administración IT"
             >
               <Shield size={18} />
-              Panel Admin
+              Panel
             </NavLink>
           )}
 
           <NavLink
             to="/tv-dashboard"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ color: '#f43f5e' }}
+            style={{ color: '#f43f5e', padding: '0.45rem 0.65rem' }}
+            title="Modo TV Kiosk"
           >
-            <Tv size={18} />
-            Modo TV
+            <Tv size={19} />
           </NavLink>
         </nav>
 
         {/* Desktop User & Theme Controls */}
-        <div className="desktop-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-          {/* Theme Switcher Button */}
+        <div className="desktop-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Theme Switcher Icon-only Button */}
           <button
             className="btn btn-secondary"
             onClick={toggleTheme}
             title={theme === 'light' ? 'Cambiar a Modo Azul Oscuro' : 'Cambiar a Modo Blanco'}
-            style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', gap: '0.4rem' }}
+            style={{ padding: '0.45rem 0.65rem' }}
+            aria-label="Cambiar tema"
           >
             {theme === 'light' ? (
-              <>
-                <Moon size={16} style={{ color: '#6366f1' }} />
-                Modo Azul
-              </>
+              <Moon size={18} style={{ color: '#6366f1' }} />
             ) : (
-              <>
-                <Sun size={16} style={{ color: '#f59e0b' }} />
-                Modo Blanco
-              </>
+              <Sun size={18} style={{ color: '#f59e0b' }} />
             )}
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
+          {/* User Avatar Circle */}
+          <div
+            title={`Usuario: ${user?.name || user?.username} (${isAdmin ? 'ADMIN DE IT' : 'CONSULTA'})`}
+            style={{
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               background: isAdmin ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)' : 'linear-gradient(135deg, #002B90 0%, #1d4ed8 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff'
-            }}>
-              {isAdmin ? <Shield size={15} /> : <UserIcon size={15} />}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.88rem' }}>{user?.name || user?.username}</span>
-              <span style={{ fontSize: '0.68rem', color: isAdmin ? '#c084fc' : '#60a5fa', fontWeight: 800 }}>
-                {isAdmin ? 'ADMIN DE IT' : 'USUARIO DE CONSULTA'}
-              </span>
-            </div>
+              color: '#ffffff',
+              cursor: 'default',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)'
+            }}
+          >
+            {isAdmin ? <Shield size={16} /> : <UserIcon size={16} />}
           </div>
 
           <button className="btn btn-secondary" onClick={() => { logout(); navigate('/login'); }} style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem' }}>
@@ -398,7 +392,7 @@ export const Navbar: React.FC = () => {
                       onClick={() => setMobileDrawerOpen(false)}
                     >
                       <Shield size={19} style={{ color: '#c084fc' }} />
-                      <span>Panel Administrador IT</span>
+                      <span>Panel</span>
                     </NavLink>
                   )}
 
