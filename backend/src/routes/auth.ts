@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../utils/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
@@ -50,13 +51,22 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       console.error('FATAL: JWT_SECRET no configurado. El servidor no puede firmar tokens de autenticación.');
       return res.status(500).json({ error: 'Error de configuración interna del servidor' });
     }
+
+    // Single active session enforcement: generate new unique session ID
+    const sessionId = uuidv4();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { currentSessionId: sessionId }
+    });
+
     const token = jwt.sign(
       {
         id: user.id,
         email: user.email,
         username: user.username,
         name: user.name,
-        role: user.role
+        role: user.role,
+        sessionId
       },
       secret,
       { expiresIn: '12h' }

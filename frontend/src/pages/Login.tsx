@@ -27,7 +27,9 @@ export const Login: React.FC = () => {
     if (isAuthenticated) {
       navigate('/inventory');
     }
-    if (searchParams.get('expired') === '1') {
+    if (searchParams.get('concurrent') === '1') {
+      setError('⚠️ Tu sesión ha sido cerrada automáticamente porque se inició sesión con esta misma cuenta en otro dispositivo o navegador.');
+    } else if (searchParams.get('expired') === '1') {
       setError('Su sesión ha expirado o se cerró por inactividad. Por favor ingrese nuevamente.');
     }
   }, [isAuthenticated, navigate, searchParams]);

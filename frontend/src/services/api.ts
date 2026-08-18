@@ -96,10 +96,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
+      const isConcurrent = error.response.data?.code === 'CONCURRENT_SESSION_TERMINATED';
       localStorage.removeItem('qr_inventory_token');
       localStorage.removeItem('qr_inventory_user');
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=1';
+        window.location.href = isConcurrent ? '/login?concurrent=1' : '/login?expired=1';
       }
     }
     return Promise.reject(error);
