@@ -127,71 +127,22 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="nav-links desktop-nav-links" style={{ gap: '0.35rem' }}>
+        <nav className="nav-links desktop-nav-links" style={{ gap: '0.6rem' }}>
           <NavLink
-            to="/inventory?tab=assigned"
-            className={() => `nav-item ${location.pathname === '/inventory' && (!location.search || location.search.includes('tab=assigned')) ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
+            to="/inventory"
+            className={() => `nav-item ${location.pathname === '/inventory' || location.pathname === '/inventory-it' || location.pathname === '/loans' ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.85rem', fontSize: '0.88rem' }}
           >
-            <Package size={16} />
-            Asignado
-          </NavLink>
-
-          <NavLink
-            to="/inventory?tab=available"
-            className={() => `nav-item ${location.search.includes('tab=available') || location.pathname === '/inventory-it' ? 'active' : ''}`}
-            style={{ color: 'var(--coficab-copper)', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-          >
-            <Laptop size={16} />
-            Disponible
-          </NavLink>
-
-          <NavLink
-            to="/inventory?tab=loans"
-            className={() => `nav-item ${location.search.includes('tab=loans') || location.pathname === '/loans' ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
-            title="Control de Préstamos Temporales de IT"
-          >
-            <ArrowRightLeft size={16} style={{ color: '#6366f1' }} />
-            Préstamos
-          </NavLink>
-
-          <NavLink
-            to="/inventory?tab=scrap"
-            className={() => `nav-item ${location.search.includes('tab=scrap') ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', color: '#f43f5e' }}
-            title="Bajas y Scrap"
-          >
-            <Trash2 size={16} />
-            Bajas
-          </NavLink>
-
-          <NavLink
-            to="/inventory?tab=transfers"
-            className={() => `nav-item ${location.search.includes('tab=transfers') ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', color: '#0ea5e9' }}
-            title="Transferencias entre Plantas"
-          >
-            <Truck size={16} />
-            Transferencias
-          </NavLink>
-
-          <NavLink
-            to="/inventory?tab=damaged"
-            className={() => `nav-item ${location.search.includes('tab=damaged') ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', color: '#f59e0b' }}
-            title="Equipos Dañados y Con Fallas"
-          >
-            <AlertTriangle size={16} />
-            Dañado
+            <Package size={17} />
+            Inventario
           </NavLink>
 
           <NavLink
             to="/scanner"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
+            style={{ padding: '0.45rem 0.85rem', fontSize: '0.88rem' }}
           >
-            <Scan size={16} />
+            <Scan size={17} />
             Escanear
           </NavLink>
 
@@ -439,60 +390,15 @@ export const Navbar: React.FC = () => {
 
               {/* Group 1: Módulos de Inventario */}
               <div>
-                <div className="drawer-section-title">Estados de Inventario</div>
+                <div className="drawer-section-title">Inventario & Escaneo</div>
                 <div className="drawer-nav-group">
                   <NavLink
-                    to="/inventory?tab=assigned"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=assigned') || (location.pathname === '/inventory' && !location.search) ? 'active' : ''}`}
+                    to="/inventory"
+                    className={() => `drawer-nav-item ${location.pathname === '/inventory' ? 'active' : ''}`}
                     onClick={() => setMobileDrawerOpen(false)}
                   >
                     <Package size={19} style={{ color: 'var(--primary)' }} />
-                    <span>1. Inventario Asignado</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/inventory?tab=available"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=available') || location.pathname === '/inventory-it' ? 'active-copper' : ''}`}
-                    onClick={() => setMobileDrawerOpen(false)}
-                  >
-                    <Laptop size={19} style={{ color: 'var(--coficab-copper)' }} />
-                    <span>2. Inventario Disponible (IT)</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/inventory?tab=loans"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=loans') || location.pathname === '/loans' ? 'active' : ''}`}
-                    onClick={() => setMobileDrawerOpen(false)}
-                  >
-                    <ArrowRightLeft size={19} style={{ color: '#6366f1' }} />
-                    <span>3. Préstamos Temporales</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/inventory?tab=scrap"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=scrap') ? 'active' : ''}`}
-                    onClick={() => setMobileDrawerOpen(false)}
-                  >
-                    <Trash2 size={19} style={{ color: '#f43f5e' }} />
-                    <span>4. Bajas & Scrap</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/inventory?tab=transfers"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=transfers') ? 'active' : ''}`}
-                    onClick={() => setMobileDrawerOpen(false)}
-                  >
-                    <Truck size={19} style={{ color: '#0ea5e9' }} />
-                    <span>5. Transferencias (Planta 2/UPCAST)</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/inventory?tab=damaged"
-                    className={() => `drawer-nav-item ${location.search.includes('tab=damaged') ? 'active' : ''}`}
-                    onClick={() => setMobileDrawerOpen(false)}
-                  >
-                    <AlertTriangle size={19} style={{ color: '#f59e0b' }} />
-                    <span>6. Dañado / Con Fallas</span>
+                    <span>Inventario de Equipos</span>
                   </NavLink>
 
                   <NavLink
