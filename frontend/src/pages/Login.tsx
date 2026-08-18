@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CoficabLogo } from '../components/CoficabLogo';
-import { Lock, User, AlertCircle, ArrowRight, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Lock, User, AlertCircle, ArrowRight, Sun, Moon } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const [identifier, setIdentifier] = useState<string>('pclapida');
-  const [password, setPassword] = useState<string>('admin123');
+  const [identifier, setIdentifier] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -126,9 +126,10 @@ export const Login: React.FC = () => {
                 className="form-input"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="ej. admin@inventory.com"
+                placeholder="ej. usuario@inventory.com"
                 required
                 style={{ paddingLeft: '2.5rem' }}
+                autoComplete="username"
               />
               <User size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
             </div>
@@ -145,6 +146,7 @@ export const Login: React.FC = () => {
                 placeholder="••••••••"
                 required
                 style={{ paddingLeft: '2.5rem' }}
+                autoComplete="current-password"
               />
               <Lock size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
             </div>
@@ -154,7 +156,7 @@ export const Login: React.FC = () => {
             type="submit"
             className="btn btn-primary btn-lg"
             disabled={loading}
-            style={{ width: '100%', marginBottom: '1.5rem' }}
+            style={{ width: '100%' }}
           >
             {loading ? 'Autenticando...' : (
               <>
@@ -164,22 +166,6 @@ export const Login: React.FC = () => {
             )}
           </button>
         </form>
-
-        <div style={{
-          padding: '0.85rem',
-          background: 'var(--bg-card-hover)',
-          borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border-color)',
-          fontSize: '0.8rem',
-          color: 'var(--text-muted)',
-          textAlign: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--coficab-copper)', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <ShieldCheck size={16} /> Credenciales de Acceso COFICAB:
-          </div>
-          <div>Usuario: <strong style={{ color: 'var(--text-main)' }}>pclapida</strong></div>
-          <div>Contraseña: <strong style={{ color: 'var(--text-main)' }}>admin123</strong></div>
-        </div>
       </div>
     </div>
   );
