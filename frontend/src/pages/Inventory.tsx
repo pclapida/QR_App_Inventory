@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api, { Item } from '../services/api';
+import api, { Item, itemsApi, DeviceLoan, loansApi } from '../services/api';
 import { QRModal } from '../components/QRModal';
 import { ItemEditModal, ItemEditFormData } from '../components/inventory/ItemEditModal';
 import { ItemDetailModal } from '../components/inventory/ItemDetailModal';
-import { ExcelImportModal } from '../components/inventory/ExcelImportModal';
 import { DecommissionModal } from '../components/inventory/DecommissionModal';
 import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
 import { InventoryReportModal } from '../components/inventory/InventoryReportModal';
 import { ThermalLabelModal } from '../components/ThermalLabelModal';
+import { ResponsivaModal } from '../components/ResponsivaModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -25,44 +25,29 @@ import {
   MapPin,
   X,
   Check,
-  FileSpreadsheet,
-  Upload,
   CheckCircle2,
   ShieldCheck,
   User,
   ChevronDown,
   ChevronRight,
-  Server,
   Printer,
-  MousePointer,
   Wrench,
   Laptop,
   FileText,
   Eye,
-  Lock,
-  Unlock,
   Shield,
-  Monitor,
-  Cpu,
   Tag,
-  MapPin as MapPinIcon,
   Calendar,
-  Hash,
   Clock,
-  RotateCcw
+  RotateCcw,
+  ArrowRightLeft,
+  Truck,
+  AlertCircle,
+  Undo2,
+  Info
 } from 'lucide-react';
 
-const CATEGORY_MIN_STOCK: Record<string, number> = {
-  'Laptops': 5,
-  'Monitores': 5,
-  'Mini PCs & Desktops': 3,
-  'Tablets': 3,
-  'Impresoras Zebra': 2,
-  'Scanners': 5,
-  'Equipos & Dispositivos': 2,
-  'Hardware & Lectores': 5,
-  'Maquinaria': 1
-};
+export type InventoryTabType = 'ASSIGNED' | 'AVAILABLE' | 'LOANS' | 'SCRAP' | 'TRANSFERS';
 
 interface InventoryProps {
   mode?: 'PLANT' | 'IT';
@@ -70,65 +55,102 @@ interface InventoryProps {
 
 export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const [inventoryTab, setInventoryTab] = useState<'PLANT' | 'IT'>(() => mode || 'PLANT');
 
-  useEffect(() => {
-    if (mode) setInventoryTab(mode);
-  }, [mode]);
+  // 5 Tabs: ASSIGNED, AVAILABLE, LOANS, SCRAP, TRANSFERS
+  const [activeTab, setActiveTab] = useState<InventoryTabType>(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'available' || mode === 'IT') return 'AVAILABLE';
+    if (tabParam === 'loans') return 'LOANS';
+    if (tabParam === 'scrap') return 'SCRAP';
+    if (tabParam === 'transfers') return 'TRANSFERS';
+    return 'ASSIGNED';
+  });
 
   const [items, setItems] = useState<Item[]>([]);
+  const [loans, setLoans] = useState<DeviceLoan[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPlant, setSelectedPlant] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'DECOMMISSIONED' | 'ALL'>('ACTIVE');
   const [onlyLowStock, setOnlyLowStock] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
-  // Selected item for QR Modal
+  // Selected item for modals
   const [selectedQRItem, setSelectedQRItem] = useState<Item | null>(null);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [viewingItem, setViewingItem] = useState<Item | null>(null);
+  const [timelineItem, setTimelineItem] = useState<Item | null>(null);
+  const [decommissionItem, setDecommissionItem] = useState<Item | null>(null);
+  const [assigningItem, setAssigningItem] = useState<Item | null>(null);
+  const [transferringItem, setTransferringItem] = useState<Item | null>(null);
+  const [permanentDeleteItem, setPermanentDeleteItem] = useState<Item | null>(null);
+  const [thermalItems, setThermalItems] = useState<Item[] | null>(null);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
 
-  // Accordion state
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  // Transfer modal state
+  const [targetPlant, setTargetPlant] = useState<string>('Planta UPCAST');
+  const [transferNotes, setTransferNotes] = useState<string>('');
+  const [transferring, setTransferring] = useState<boolean>(false);
 
-  // Batch Print state
+  // Loans modal state
+  const [loanReturnTarget, setLoanReturnTarget] = useState<DeviceLoan | null>(null);
+  const [loanReturnNotes, setLoanReturnNotes] = useState<string>('');
+  const [returningLoan, setReturningLoan] = useState<boolean>(false);
+  const [showNewLoanModal, setShowNewLoanModal] = useState<boolean>(false);
+  const [selectedLoanItemId, setSelectedLoanItemId] = useState<string>('');
+  const [borrowerName, setBorrowerName] = useState<string>('');
+  const [borrowerArea, setBorrowerArea] = useState<string>('');
+  const [borrowerBadge, setBorrowerBadge] = useState<string>('');
+  const [expectedReturnDate, setExpectedReturnDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(17, 0, 0, 0);
+    return d.toISOString().slice(0, 16);
+  });
+  const [loanNotes, setLoanNotes] = useState<string>('');
+  const [submittingLoan, setSubmittingLoan] = useState<boolean>(false);
+
+  // Batch Print selection state
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+
+  // Accordion state for categories
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
   };
 
-  // Modular Modals State
-  const [showImportModal, setShowImportModal] = useState<boolean>(false);
-  const [showReportModal, setShowReportModal] = useState<boolean>(false);
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [viewingItem, setViewingItem] = useState<Item | null>(null);
-  const [timelineItem, setTimelineItem] = useState<Item | null>(null);
-  const [decommissionItem, setDecommissionItem] = useState<Item | null>(null);
-  const [thermalItems, setThermalItems] = useState<Item[] | null>(null);
-
   const fetchItems = async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: any = {};
-      if (searchQuery.trim()) params.q = searchQuery.trim();
-      if (selectedCategory) params.category = selectedCategory;
-      if (selectedPlant) params.plant = selectedPlant;
-      params.status = statusFilter;
-      params.isITInternal = inventoryTab === 'IT' ? 'true' : 'false';
+      if (activeTab === 'LOANS') {
+        const loansData = await loansApi.getAll();
+        setLoans(loansData);
+        const allItemsRes = await itemsApi.getAll();
+        const rawItems = Array.isArray(allItemsRes) ? allItemsRes : (allItemsRes?.items || []);
+        setItems(rawItems.filter((i: Item) => i.status !== 'DECOMMISSIONED'));
+      } else {
+        const params: any = {};
+        if (searchQuery.trim()) params.q = searchQuery.trim();
+        if (selectedCategory) params.category = selectedCategory;
+        if (selectedPlant) params.plant = selectedPlant;
 
-      const res = await api.get('/items', { params });
-      let resultItems: Item[] = res.data.items;
+        params.tab = activeTab;
 
-      if (onlyLowStock) {
-        resultItems = resultItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock));
+        const res = await itemsApi.getAll(params);
+        let resultItems: Item[] = Array.isArray(res) ? res : (res?.items || []);
+
+        if (onlyLowStock && activeTab === 'AVAILABLE') {
+          resultItems = resultItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock));
+        }
+
+        setItems(resultItems);
       }
-
-      setItems(resultItems);
     } catch (err: any) {
       console.error('Error al cargar inventario:', err);
       setError('Error al conectar con el servidor para consultar inventario.');
@@ -140,33 +162,124 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchItems();
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedCategory, selectedPlant, statusFilter, onlyLowStock, inventoryTab]);
+  }, [searchQuery, selectedCategory, selectedPlant, onlyLowStock, activeTab]);
 
-  const handleDeleteItem = async (id: string, name: string) => {
-    if (!window.confirm(`¿Está seguro de eliminar el artículo "${name}"?`)) return;
+  // Handle Unassign (Return to IT Available)
+  const handleUnassignItem = async (item: Item) => {
+    const reason = window.prompt(`¿Desea retirar el equipo "${item.name}" asignado a ${item.assignedTo || 'colaborador'} y devolverlo al Inventario Disponible de IT?\n\n(Opcional) Ingrese observaciones:`, 'Retiro por cambio / reubicación');
+    if (reason === null) return;
 
     try {
-      await api.delete(`/items/${id}`);
-      setActionSuccessMsg(`Artículo "${name}" eliminado correctamente.`);
+      await itemsApi.unassign(item.id, { notes: reason });
+      setActionSuccessMsg(`Equipo "${item.name}" retornado exitosamente al Inventario Disponible de IT.`);
       fetchItems();
-    } catch (err) {
-      console.error('Error al eliminar:', err);
-      alert('Error al eliminar el artículo.');
+    } catch (err: any) {
+      console.error('Error al desasignar:', err);
+      alert(err.response?.data?.error || 'Error al devolver el equipo al inventario disponible.');
     }
   };
 
+  // Handle Reactivate from Scrap
   const handleReactivateItem = async (item: Item) => {
-    if (!window.confirm(`¿Desea reactivar el activo "${item.name}" al inventario activo?`)) return;
+    if (!window.confirm(`¿Desea reactivar el activo "${item.name}" (${item.sku}) y regresarlo al Inventario Disponible de IT?`)) return;
     try {
-      await api.post(`/items/${item.id}/reactivate`, { newStock: 1 });
-      setActionSuccessMsg(`¡Activo "${item.name}" reactivado correctamente al inventario!`);
+      await itemsApi.reactivate(item.id, { newStock: 1 });
+      setActionSuccessMsg(`¡Activo "${item.name}" reactivado correctamente al Inventario Disponible!`);
       fetchItems();
     } catch (err: any) {
       console.error('Error al reactivar:', err);
       alert(err.response?.data?.error || 'Error al reactivar el activo.');
+    }
+  };
+
+  // Handle Permanent Delete (ONLY permitted in SCRAP)
+  const handleConfirmPermanentDelete = async () => {
+    if (!permanentDeleteItem) return;
+    try {
+      await itemsApi.deletePermanent(permanentDeleteItem.id);
+      setActionSuccessMsg(`Activo "${permanentDeleteItem.name}" eliminado permanentemente de la base de datos.`);
+      setPermanentDeleteItem(null);
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al eliminar permanentemente:', err);
+      alert(err.response?.data?.error || 'Error al eliminar el activo.');
+    }
+  };
+
+  // Handle Plant Transfer
+  const handleExecuteTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transferringItem) return;
+    setTransferring(true);
+    try {
+      await itemsApi.transfer(transferringItem.id, {
+        targetPlant,
+        notes: transferNotes.trim() || undefined
+      });
+      setActionSuccessMsg(`Equipo trasladado exitosamente a ${targetPlant}.`);
+      setTransferringItem(null);
+      setTransferNotes('');
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al transferir:', err);
+      alert(err.response?.data?.error || 'Error al procesar el traslado de planta.');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  // Handle Loan Return
+  const handleConfirmLoanReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loanReturnTarget) return;
+    setReturningLoan(true);
+    try {
+      await loansApi.returnLoan(loanReturnTarget.id, loanReturnNotes.trim() || undefined);
+      setActionSuccessMsg(`Préstamo devuelto correctamente por ${loanReturnTarget.borrowerName}.`);
+      setLoanReturnTarget(null);
+      setLoanReturnNotes('');
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al registrar devolución:', err);
+      alert(err.response?.data?.error || 'Error al devolver préstamo.');
+    } finally {
+      setReturningLoan(false);
+    }
+  };
+
+  // Handle New Loan Creation
+  const handleCreateLoan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLoanItemId || !borrowerName.trim()) {
+      alert('Por favor seleccione el equipo y capture el nombre del solicitante.');
+      return;
+    }
+    setSubmittingLoan(true);
+    try {
+      await loansApi.create({
+        itemId: selectedLoanItemId,
+        borrowerName: borrowerName.trim(),
+        borrowerArea: borrowerArea.trim() || undefined,
+        borrowerBadge: borrowerBadge.trim() || undefined,
+        expectedReturn: new Date(expectedReturnDate).toISOString(),
+        loanNotes: loanNotes.trim() || undefined
+      });
+      setActionSuccessMsg(`Préstamo registrado exitosamente a ${borrowerName.trim()}.`);
+      setShowNewLoanModal(false);
+      setSelectedLoanItemId('');
+      setBorrowerName('');
+      setBorrowerArea('');
+      setBorrowerBadge('');
+      setLoanNotes('');
+      fetchItems();
+    } catch (err: any) {
+      console.error('Error al crear préstamo:', err);
+      alert(err.response?.data?.error || 'Error al registrar el préstamo.');
+    } finally {
+      setSubmittingLoan(false);
     }
   };
 
@@ -181,768 +294,913 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     await api.put(`/items/${itemId}`, {
       ...formData,
       customAttributes: Object.keys(customAttributesObj).length > 0 ? customAttributesObj : null,
-      location: formData.isITInternal ? 'Taller Interno IT' : formData.area
+      location: formData.isITInternal ? 'Taller Interno IT' : (formData.area || formData.plant)
     });
     setActionSuccessMsg(`Artículo actualizado correctamente.`);
     fetchItems();
   };
 
-  const totalItemsCount = items.length;
-  const totalStockSum = items.reduce((acc, item) => acc + item.stock, 0);
+  // KPI Calculations
+  const totalCount = items.length;
+  const totalStockSum = items.reduce((acc, i) => acc + i.stock, 0);
+  const lowStockCount = useMemo(() => {
+    return items.filter(i => (i.stock === 0) || (i.minStock > 0 && i.stock <= i.minStock)).length;
+  }, [items]);
 
   // Group items by category
-  const groupedItems = items.reduce((acc, item) => {
-    const cat = item.category || 'Sin Categoría';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {} as Record<string, Item[]>);
+  const groupedItems = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const cat = item.category || 'Sin Categoría';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    }, {} as Record<string, Item[]>);
+  }, [items]);
 
-  // Calculate alerts based on category stock
-  let lowStockCount = 0;
-  
-  Object.keys(groupedItems).forEach(cat => {
-    const catItems = groupedItems[cat];
-    // Consumables use individual item minStock rules
-    if (cat === 'Consumibles' || cat === 'Herramientas') {
-      const lowItems = catItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)).length;
-      lowStockCount += lowItems;
-    } else {
-      // Serialized assets use aggregate available stock
-      const availableStock = catItems.filter(i => i.stock > 0 && !i.assignedTo && !i.area).length;
-      const targetMin = CATEGORY_MIN_STOCK[cat] || 2;
-      if (availableStock < targetMin) {
-        lowStockCount++; // 1 alert per category
-      }
-    }
-  });
+  // Filtered loans list for LOANS tab
+  const filteredLoans = useMemo(() => {
+    if (activeTab !== 'LOANS') return [];
+    return loans.filter((loan) => {
+      const matchesSearch =
+        loan.borrowerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (loan.borrowerArea && loan.borrowerArea.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (loan.item && loan.item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (loan.item && loan.item.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return matchesSearch;
+    });
+  }, [loans, searchQuery, activeTab]);
 
   return (
     <div>
-      <div style={{
-        display: 'flex',
-        gap: '0.75rem',
-        marginBottom: '1.5rem',
-        background: 'var(--bg-input)',
-        padding: '0.5rem',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border-color)',
-        flexWrap: 'wrap'
-      }}>
-        <button
-          className={`btn ${inventoryTab === 'PLANT' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => {
-            setInventoryTab('PLANT');
-            setSelectedPlant('');
-          }}
-          style={{
-            fontSize: '0.95rem',
-            fontWeight: 800,
-            padding: '0.6rem 1.25rem'
-          }}
-        >
-          Inventario Operativo de Plantas
-        </button>
-
-        <button
-          className={`btn ${inventoryTab === 'IT' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => {
-            setInventoryTab('IT');
-            setSelectedPlant('');
-          }}
-          style={{
-            fontSize: '0.95rem',
-            fontWeight: 800,
-            padding: '0.6rem 1.25rem',
-            background: inventoryTab === 'IT' ? 'linear-gradient(135deg, #c98a4b 0%, #b07238 100%)' : undefined,
-            borderColor: inventoryTab === 'IT' ? 'var(--coficab-copper)' : undefined
-          }}
-        >
-          Inventario Interno de IT
-        </button>
-      </div>
-
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            {inventoryTab === 'IT' ? 'Inventario Interno del Departamento de IT' : 'Panel de Equipos Operativos en Plantas'}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {inventoryTab === 'IT'
-              ? 'Stock de taller de Sistemas, equipos de respaldo, refacciones, repuestos, cables, adaptadores y consumibles de IT.'
-              : 'Monitoreo y control de equipos y dispositivos en funcionamiento activo en líneas y áreas operativas (Planta 1, 2, 3 u UPCAST).'}
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowReportModal(true)}
-            style={{ borderColor: 'var(--coficab-blue-bright)', color: 'var(--coficab-blue-bright)' }}
-            title="Generar reporte para imprimir o exportar a PDF"
-          >
-            <Printer size={18} />
-            Exportar Reporte PDF
-          </button>
-
-          {inventoryTab === 'PLANT' && (
-            <button className="btn btn-secondary" onClick={() => setShowImportModal(true)} style={{ borderColor: 'var(--border-copper)' }}>
-              <FileSpreadsheet size={18} style={{ color: 'var(--coficab-copper)' }} />
-              Importar Excel / CSV
-            </button>
-          )}
-
-          <button className="btn btn-secondary" onClick={() => navigate('/scanner')}>
-            <Scan size={18} />
-            Escanear QR
-          </button>
-
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate(inventoryTab === 'IT' ? '/add-item?isIT=1' : '/add-item')}
-            style={inventoryTab === 'IT' ? { background: 'linear-gradient(135deg, #c98a4b 0%, #b07238 100%)' } : undefined}
-          >
-            <PlusCircle size={18} />
-            {inventoryTab === 'IT' ? 'Nuevo Artículo IT' : 'Nuevo Artículo'}
-          </button>
-        </div>
-      </div>
-
+      {/* Toast Notification */}
       {actionSuccessMsg && (
         <div style={{
-          padding: '1rem 1.25rem',
-          background: 'rgba(16, 185, 129, 0.14)',
-          border: '1px solid rgba(16, 185, 129, 0.35)',
+          padding: '0.85rem 1.25rem',
+          background: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid rgba(16, 185, 129, 0.4)',
           borderRadius: 'var(--radius-md)',
-          color: '#34d399',
-          fontSize: '0.95rem',
-          marginBottom: '1.5rem',
+          color: '#10b981',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          marginBottom: '1.25rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontWeight: 600
+          animation: 'fadeIn 0.2s ease'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <CheckCircle2 size={20} /> {actionSuccessMsg}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={18} />
+            <span>{actionSuccessMsg}</span>
           </div>
-          <button onClick={() => setActionSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#34d399', cursor: 'pointer' }}>
-            <X size={18} />
+          <button
+            onClick={() => setActionSuccessMsg(null)}
+            style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer' }}
+          >
+            <X size={16} />
           </button>
         </div>
       )}
 
-      {/* Status Filter Bar (Activos vs Dados de Baja / Scrap) */}
+      {/* 5-TAB NAVIGATION BAR */}
       <div style={{
         display: 'flex',
-        gap: '0.5rem',
-        alignItems: 'center',
-        background: 'rgba(255, 255, 255, 0.03)',
-        padding: '0.4rem 0.6rem',
-        borderRadius: 'var(--radius-md)',
+        flexWrap: 'wrap',
+        gap: '0.4rem',
+        padding: '0.4rem',
+        background: 'var(--bg-input)',
+        borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--border-color)',
-        marginBottom: '1.5rem',
-        flexWrap: 'wrap'
+        marginBottom: '1.5rem'
       }}>
-        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', marginLeft: '0.4rem', marginRight: '0.4rem' }}>
-          ESTADO DE ACTIVOS:
-        </span>
+        {/* Tab 1: Asignado */}
         <button
-          className={`btn ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setStatusFilter('ACTIVE')}
-          style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}
-        >
-          🟢 {inventoryTab === 'IT' ? 'Inventario Activo (En Stock)' : 'Equipos Activos (En Servicio)'}
-        </button>
-        <button
-          className={`btn ${statusFilter === 'DECOMMISSIONED' ? 'btn-danger' : 'btn-secondary'}`}
-          onClick={() => setStatusFilter('DECOMMISSIONED')}
+          type="button"
+          onClick={() => {
+            setActiveTab('ASSIGNED');
+            setSearchParams({ tab: 'assigned' });
+          }}
           style={{
-            padding: '0.35rem 0.85rem',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            borderColor: statusFilter === 'DECOMMISSIONED' ? '#ef4444' : undefined,
-            color: statusFilter === 'DECOMMISSIONED' ? '#ffffff' : '#f87171'
+            flex: '1 1 auto',
+            minWidth: '140px',
+            padding: '0.65rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'ASSIGNED' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'ASSIGNED' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'ASSIGNED' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'ASSIGNED' ? '0 4px 12px rgba(0, 43, 144, 0.4)' : 'none'
           }}
         >
-          🗑️ Historial Dados de Baja / Scrap (Basura)
+          <Package size={17} />
+          <span>1. Asignado</span>
         </button>
+
+        {/* Tab 2: Disponible (IT) */}
         <button
-          className={`btn ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setStatusFilter('ALL')}
-          style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', fontWeight: 700 }}
+          type="button"
+          onClick={() => {
+            setActiveTab('AVAILABLE');
+            setSearchParams({ tab: 'available' });
+          }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '140px',
+            padding: '0.65rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'AVAILABLE' ? 'var(--coficab-copper)' : 'transparent',
+            color: activeTab === 'AVAILABLE' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'AVAILABLE' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'AVAILABLE' ? '0 4px 12px rgba(201, 138, 75, 0.4)' : 'none'
+          }}
         >
-          📋 Todos los Registros
+          <Laptop size={17} />
+          <span>2. Disponible (IT)</span>
+        </button>
+
+        {/* Tab 3: Préstamos */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('LOANS');
+            setSearchParams({ tab: 'loans' });
+          }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '130px',
+            padding: '0.65rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'LOANS' ? '#6366f1' : 'transparent',
+            color: activeTab === 'LOANS' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'LOANS' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'LOANS' ? '0 4px 12px rgba(99, 102, 241, 0.4)' : 'none'
+          }}
+        >
+          <ArrowRightLeft size={17} />
+          <span>3. Préstamos</span>
+        </button>
+
+        {/* Tab 4: Bajas / Scrap */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('SCRAP');
+            setSearchParams({ tab: 'scrap' });
+          }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '130px',
+            padding: '0.65rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'SCRAP' ? '#f43f5e' : 'transparent',
+            color: activeTab === 'SCRAP' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'SCRAP' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'SCRAP' ? '0 4px 12px rgba(244, 63, 94, 0.4)' : 'none'
+          }}
+        >
+          <Trash2 size={17} />
+          <span>4. Bajas / Scrap</span>
+        </button>
+
+        {/* Tab 5: Transferencias */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('TRANSFERS');
+            setSearchParams({ tab: 'transfers' });
+          }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: '130px',
+            padding: '0.65rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeTab === 'TRANSFERS' ? '#0ea5e9' : 'transparent',
+            color: activeTab === 'TRANSFERS' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: activeTab === 'TRANSFERS' ? 800 : 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            transition: 'all 0.15s ease',
+            boxShadow: activeTab === 'TRANSFERS' ? '0 4px 12px rgba(14, 165, 233, 0.4)' : 'none'
+          }}
+        >
+          <Truck size={17} />
+          <span>5. Transferencias</span>
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* HEADER ACTIONS & TITLE */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            {activeTab === 'ASSIGNED' && <><Package style={{ color: 'var(--primary)' }} /> Inventario Asignado</>}
+            {activeTab === 'AVAILABLE' && <><Laptop style={{ color: 'var(--coficab-copper)' }} /> Inventario Disponible (Almacén IT)</>}
+            {activeTab === 'LOANS' && <><ArrowRightLeft style={{ color: '#6366f1' }} /> Préstamos Temporales de IT</>}
+            {activeTab === 'SCRAP' && <><Trash2 style={{ color: '#f43f5e' }} /> Bajas de Activos & Scrap</>}
+            {activeTab === 'TRANSFERS' && <><Truck style={{ color: '#0ea5e9' }} /> Transferencias de Planta (Planta 2 / UPCAST)</>}
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
+            {activeTab === 'ASSIGNED' && 'Equipos operativos entregados y asignados formalmente a colaboradores o departamentos.'}
+            {activeTab === 'AVAILABLE' && 'Equipos en stock del taller de IT listos para ser asignados con responsiva o prestados.'}
+            {activeTab === 'LOANS' && 'Control de préstamos temporales de laptops, proyectores y accesorios con fecha de devolución.'}
+            {activeTab === 'SCRAP' && 'Histórico de equipos desincorporados por daño, obsolescencia o disposición E-Waste.'}
+            {activeTab === 'TRANSFERS' && 'Equipos ubicados físicamente en Planta 2 o Planta UPCAST con trazabilidad de origen.'}
+          </p>
+        </div>
 
-        <div
-          className="glass-panel glass-panel-interactive"
-          style={{ padding: '1.25rem', cursor: 'pointer' }}
-          onClick={() => setOnlyLowStock(false)}
-        >
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <span>{inventoryTab === 'IT' ? 'Total Artículos IT' : 'Total Equipos Registrados'}</span>
-            <Package size={20} style={{ color: 'var(--primary)' }} />
+        {/* Action Buttons based on Active Tab */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Add Item button: ONLY active in AVAILABLE tab */}
+          {isAdmin && activeTab === 'AVAILABLE' && (
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/add-item')}
+              style={{ fontWeight: 700 }}
+            >
+              <PlusCircle size={18} />
+              + Registrar Activo en IT
+            </button>
+          )}
+
+          {isAdmin && activeTab === 'ASSIGNED' && (
+            <div title="Para asignar un equipo, regístralo primero en Disponible y usa la opción 'Asignar a Colaborador'">
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setActiveTab('AVAILABLE');
+                  setActionSuccessMsg('Selecciona un equipo de Inventario Disponible y presiona "Asignar (📋)" para generar su responsiva.');
+                }}
+                style={{ opacity: 0.9, borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 600 }}
+              >
+                <Info size={16} />
+                ¿Cómo asignar un equipo?
+              </button>
+            </div>
+          )}
+
+          {isAdmin && activeTab === 'LOANS' && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowNewLoanModal(true)}
+              style={{ fontWeight: 700, background: '#6366f1' }}
+            >
+              <PlusCircle size={18} />
+              + Nuevo Préstamo
+            </button>
+          )}
+
+          <button className="btn btn-secondary" onClick={() => setShowReportModal(true)}>
+            <FileText size={17} />
+            Reporte PDF / QR
+          </button>
+
+          <button className="btn btn-secondary" onClick={fetchItems} title="Recargar">
+            <RefreshCw size={17} className={loading ? 'spinning' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* KPI METRIC CARDS */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '1rem',
+        marginBottom: '1.75rem'
+      }}>
+        <div className="glass-panel" style={{ padding: '1.1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+            <span>
+              {activeTab === 'ASSIGNED' && 'Equipos Asignados'}
+              {activeTab === 'AVAILABLE' && 'Artículos en Stock IT'}
+              {activeTab === 'LOANS' && 'Préstamos Totales'}
+              {activeTab === 'SCRAP' && 'Activos en Bajas/Scrap'}
+              {activeTab === 'TRANSFERS' && 'Equipos Transferidos'}
+            </span>
+            <Package size={19} style={{ color: 'var(--primary)' }} />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-            {totalItemsCount}
+          <div style={{ fontSize: '1.85rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '0.2rem' }}>
+            {activeTab === 'LOANS' ? loans.length : totalCount}
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            <span>{inventoryTab === 'IT' ? 'Stock Total en Almacén IT' : 'Unidades en Operación (Uso)'}</span>
-            <Layers size={20} style={{ color: '#10b981' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
-            {totalStockSum}
-          </div>
-        </div>
+        {activeTab === 'AVAILABLE' && (
+          <>
+            <div className="glass-panel" style={{ padding: '1.1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                <span>Unidades Físicas en Almacén</span>
+                <Layers size={19} style={{ color: '#10b981' }} />
+              </div>
+              <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#10b981', marginTop: '0.2rem' }}>
+                {totalStockSum}
+              </div>
+            </div>
 
-        {inventoryTab === 'IT' ? (
-          <div
-            className="glass-panel glass-panel-interactive"
-            style={{
-              padding: '1.25rem',
-              cursor: 'pointer',
-              borderColor: onlyLowStock ? '#f59e0b' : lowStockCount > 0 ? 'rgba(245, 158, 11, 0.4)' : undefined,
-              background: onlyLowStock ? 'rgba(245, 158, 11, 0.15)' : undefined
-            }}
-            onClick={() => setOnlyLowStock(!onlyLowStock)}
-          >
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <span>Alertas Reabastecimiento</span>
-              <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
+            <div
+              className="glass-panel glass-panel-interactive"
+              style={{
+                padding: '1.1rem',
+                cursor: 'pointer',
+                borderColor: onlyLowStock ? '#f59e0b' : undefined,
+                background: onlyLowStock ? 'rgba(245, 158, 11, 0.12)' : undefined
+              }}
+              onClick={() => setOnlyLowStock(!onlyLowStock)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                <span>Stock Crítico / Bajo</span>
+                <AlertTriangle size={19} style={{ color: '#f59e0b' }} />
+              </div>
+              <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#f59e0b', marginTop: '0.2rem' }}>
+                {lowStockCount}
+              </div>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b', marginTop: '0.25rem' }}>
-              {lowStockCount} <small style={{ fontSize: '0.75rem', fontWeight: 500 }}>{onlyLowStock ? '(Filtrando)' : '(Clic para filtrar)'}</small>
+          </>
+        )}
+
+        {activeTab === 'LOANS' && (
+          <>
+            <div className="glass-panel" style={{ padding: '1.1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                <span>Préstamos Activos</span>
+                <Clock size={19} style={{ color: '#3b82f6' }} />
+              </div>
+              <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#3b82f6', marginTop: '0.2rem' }}>
+                {loans.filter(l => l.status === 'ACTIVE' && !l.isOverdue).length}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="glass-panel" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <span>Equipos con Garantía Activa</span>
-              <ShieldCheck size={20} style={{ color: 'var(--coficab-blue-bright)' }} />
+
+            <div className="glass-panel" style={{ padding: '1.1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                <span>Préstamos Vencidos</span>
+                <AlertTriangle size={19} style={{ color: '#ef4444' }} />
+              </div>
+              <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#ef4444', marginTop: '0.2rem' }}>
+                {loans.filter(l => l.status === 'OVERDUE' || l.isOverdue).length}
+              </div>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--coficab-blue-bright)', marginTop: '0.25rem' }}>
-              {items.filter(i => i.hasWarranty).length}
+          </>
+        )}
+
+        {activeTab === 'ASSIGNED' && (
+          <div className="glass-panel" style={{ padding: '1.1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              <span>Colaboradores con Equipo</span>
+              <User size={19} style={{ color: 'var(--coficab-copper)' }} />
+            </div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: 'var(--coficab-copper)', marginTop: '0.2rem' }}>
+              {new Set(items.map(i => i.assignedTo).filter(Boolean)).size}
             </div>
           </div>
         )}
-
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)', marginRight: '0.5rem' }}>
-            SELECCIONAR PLANTA:
-          </span>
-          <button
-            className={`btn ${selectedPlant === '' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedPlant('')}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', fontWeight: 700 }}
-          >
-            Todas las Plantas ({items.length})
-          </button>
-          <button
-            className={`btn ${selectedPlant === 'Planta 1' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedPlant('Planta 1')}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', fontWeight: 700 }}
-          >
-            Planta 1
-          </button>
-          <button
-            className={`btn ${selectedPlant === 'Planta 2' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedPlant('Planta 2')}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', fontWeight: 700 }}
-          >
-            Planta 2 (Principal)
-          </button>
-          <button
-            className={`btn ${selectedPlant === 'Planta 3' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedPlant('Planta 3')}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem', fontWeight: 700 }}
-          >
-            Planta 3
-          </button>
-          <button
-            className={`btn ${selectedPlant === 'Planta UPCAST' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSelectedPlant('Planta UPCAST')}
-            style={{
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.85rem',
-              fontWeight: 800,
-              borderColor: selectedPlant === 'Planta UPCAST' ? 'var(--coficab-copper)' : undefined,
-              color: selectedPlant === 'Planta UPCAST' ? '#ffffff' : undefined,
-              background: selectedPlant === 'Planta UPCAST' ? 'linear-gradient(135deg, #c98a4b 0%, #b07238 100%)' : undefined
-            }}
-          >
-            Planta UPCAST
-          </button>
+      {/* SEARCH AND FILTERS BAR */}
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.85rem', alignItems: 'center' }}>
+        {/* Search Bar */}
+        <div style={{ flex: '1 1 280px', position: 'relative' }}>
+          <input
+            type="text"
+            className="form-input"
+            placeholder={activeTab === 'LOANS' ? 'Buscar por solicitante, área, nómina o equipo...' : 'Buscar por nombre, SKU, modelo, serie, responsable, IP...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ paddingLeft: '2.5rem' }}
+          />
+          <Search size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ flex: 2, minWidth: '240px', position: 'relative' }}>
-            <input
-              type="text"
+        {/* Planta Filter (Only Planta 2 and Planta UPCAST) */}
+        {activeTab !== 'LOANS' && (
+          <div style={{ width: '180px' }}>
+            <select
               className="form-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por Nombre, Modelo, Serie, Área, IP, SKU..."
-              style={{ paddingLeft: '2.5rem' }}
-            />
-            <Search size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+              value={selectedPlant}
+              onChange={(e) => setSelectedPlant(e.target.value)}
+              style={{ fontSize: '0.85rem' }}
+            >
+              <option value="">Todas las Plantas</option>
+              <option value="Planta 2">Planta 2 (Principal)</option>
+              <option value="Planta UPCAST">Planta UPCAST</option>
+            </select>
           </div>
+        )}
 
-          <div style={{ flex: 1, minWidth: '180px' }}>
+        {/* Category Filter */}
+        {activeTab !== 'LOANS' && (
+          <div style={{ width: '190px' }}>
             <select
               className="form-input"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
+              style={{ fontSize: '0.85rem' }}
             >
               <option value="">Todas las Categorías</option>
+              <option value="Laptops & Cómputo">Laptops & Cómputo</option>
+              <option value="Monitores & Pantallas">Monitores & Pantallas</option>
+              <option value="Tablets">Tablets</option>
+              <option value="Impresoras Zebra">Impresoras Zebra</option>
               <option value="Equipos & Dispositivos">Equipos & Dispositivos</option>
               <option value="Hardware & Lectores">Hardware & Lectores</option>
               <option value="Consumibles">Consumibles</option>
-              <option value="Maquinaria">Maquinaria</option>
               <option value="Herramientas">Herramientas</option>
+              <option value="Refacciones IT">Refacciones IT</option>
             </select>
           </div>
+        )}
 
-          <button className="btn btn-secondary" onClick={fetchItems} style={{ padding: '0.75rem 1rem' }}>
-            <RefreshCw size={18} />
+        {/* Batch Print Thermal Labels Action Button */}
+        {selectedItemIds.size > 0 && activeTab !== 'LOANS' && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              const selectedItems = items.filter(i => selectedItemIds.has(i.id));
+              setThermalItems(selectedItems);
+            }}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', fontWeight: 700, gap: '0.35rem' }}
+          >
+            <Printer size={15} />
+            Imprimir {selectedItemIds.size} Etiquetas
           </button>
-        </div>
+        )}
       </div>
 
-      <div className="glass-panel" style={{ padding: '1rem' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Cargando inventario...
-          </div>
-        ) : error ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#f43f5e' }}>
-            {error}
-          </div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Package size={48} style={{ color: 'var(--text-dim)', marginBottom: '1rem' }} />
-            <p>No se encontraron artículos con el criterio especificado.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {Object.keys(groupedItems).map(cat => {
-              const catItems = groupedItems[cat];
-              const isExpanded = expandedCategories[cat];
-              const isPlantMode = inventoryTab === 'PLANT';
-              const isConsumable = cat === 'Consumibles' || cat === 'Herramientas';
-              const totalInUse = catItems.reduce((acc, i) => acc + i.stock, 0);
-
-              const availableStock = isConsumable ? 0 : catItems.filter(i => {
-                if (i.stock <= 0) return false;
-                const assigned = i.assignedTo?.toLowerCase().trim() || '';
-                if (assigned && !['it', 'taller interno it', 'sistemas', 'taller it'].includes(assigned)) {
-                  return false;
-                }
-                return true;
-              }).length;
-              const targetMin = CATEGORY_MIN_STOCK[cat] || 2;
-              const isLow = !isConsumable && (availableStock < targetMin);
-              const consumablesLow = isConsumable ? catItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)).length : 0;
-              
-              // Only IT Internal Inventory uses stock replenishment alerts. Plant view is operational equipment in use.
-              const hasAlert = !isPlantMode && (isLow || consumablesLow > 0);
-
-              let CatIcon = Package;
-              if (cat.toLowerCase().includes('laptop')) CatIcon = Laptop;
-              else if (cat.toLowerCase().includes('pc') || cat.toLowerCase().includes('desktop')) CatIcon = Server;
-              else if (cat.toLowerCase().includes('impresora') || cat.toLowerCase().includes('zebra')) CatIcon = Printer;
-              else if (cat.toLowerCase().includes('scanner') || cat.toLowerCase().includes('lector')) CatIcon = Scan;
-              else if (cat.toLowerCase().includes('herramienta')) CatIcon = Wrench;
-              else if (cat.toLowerCase().includes('hardware')) CatIcon = MousePointer;
-
+      {/* TAB CONTENT RENDER */}
+      {loading ? (
+        <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw size={36} className="spinning" style={{ margin: '0 auto 1rem auto', color: 'var(--primary)' }} />
+          <div>Cargando inventario...</div>
+        </div>
+      ) : activeTab === 'LOANS' ? (
+        /* ========================================================================= */
+        /* TAB 3: LOANS TABLE                                                        */
+        /* ========================================================================= */
+        <div className="glass-panel" style={{ overflow: 'hidden' }}>
+          {filteredLoans.length === 0 ? (
+            <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <ArrowRightLeft size={44} style={{ color: 'var(--text-dim)', margin: '0 auto 0.75rem auto' }} />
+              <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.05rem' }}>No hay préstamos registrados</div>
+              <p style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>
+                Utiliza el botón "+ Nuevo Préstamo" para prestar un equipo disponible a un colaborador.
+              </p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '0.85rem 1rem' }}>Equipo Prestado</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Solicitante / Área</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Fecha Préstamo</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Fecha Límite</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Estado</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLoans.map((loan) => {
+                    const isOverdue = loan.status === 'OVERDUE' || (loan.status === 'ACTIVE' && new Date(loan.expectedReturn) < new Date());
+                    return (
+                      <tr key={loan.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <strong style={{ color: 'var(--text-main)' }}>{loan.item?.name || 'Equipo'}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SKU: {loan.item?.sku || 'N/A'}</div>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <strong style={{ color: 'var(--text-main)' }}>{loan.borrowerName}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{loan.borrowerArea || 'Planta'} {loan.borrowerBadge ? `• #${loan.borrowerBadge}` : ''}</div>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>
+                          {new Date(loan.loanDate).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          <strong style={{ color: isOverdue && loan.status !== 'RETURNED' ? '#ef4444' : 'var(--text-main)' }}>
+                            {new Date(loan.expectedReturn).toLocaleDateString()}
+                          </strong>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
+                          {loan.status === 'RETURNED' ? (
+                            <span className="badge badge-inbound">Devuelto</span>
+                          ) : isOverdue ? (
+                            <span className="badge badge-outbound">Vencido</span>
+                          ) : (
+                            <span className="badge badge-warning">En Préstamo</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                          {loan.status !== 'RETURNED' && isAdmin && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => setLoanReturnTarget(loan)}
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                            >
+                              <CheckCircle2 size={14} /> Devolver
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* TABS 1, 2, 4, 5: ITEM TABLES ACCORDION                                    */
+        /* ========================================================================= */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {Object.keys(groupedItems).length === 0 ? (
+            <div className="glass-panel" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Package size={44} style={{ color: 'var(--text-dim)', margin: '0 auto 0.75rem auto' }} />
+              <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.05rem' }}>
+                No se encontraron artículos en esta vista
+              </div>
+              <p style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>
+                {activeTab === 'AVAILABLE' && 'No hay equipos disponibles en el taller de IT. Registra uno nuevo con el botón superior.'}
+                {activeTab === 'ASSIGNED' && 'No hay equipos asignados actualmente.'}
+                {activeTab === 'SCRAP' && 'No hay equipos dados de baja o en scrap.'}
+                {activeTab === 'TRANSFERS' && 'No hay equipos transferidos entre plantas.'}
+              </p>
+            </div>
+          ) : (
+            Object.entries(groupedItems).map(([categoryName, catItems]) => {
+              const isExpanded = expandedCategories[categoryName] !== false; // default expanded
               return (
-                <div key={cat} className="glass-panel" style={{ 
-                  overflow: 'hidden', 
-                  border: hasAlert ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--border-color)' 
-                }}>
-                  <div 
-                    onClick={() => toggleCategory(cat)}
-                    style={{ 
-                      padding: '1.25rem', 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                <div key={categoryName} className="glass-panel" style={{ overflow: 'hidden' }}>
+                  {/* Category Header Bar */}
+                  <div
+                    onClick={() => toggleCategory(categoryName)}
+                    style={{
+                      padding: '0.85rem 1.25rem',
+                      background: 'var(--bg-input)',
+                      borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
+                      display: 'flex',
                       justifyContent: 'space-between',
+                      alignItems: 'center',
                       cursor: 'pointer',
-                      background: isExpanded ? 'var(--bg-card-hover)' : 'var(--bg-main)',
-                      transition: 'background 0.2s ease',
-                      flexWrap: 'wrap',
-                      gap: '1rem'
+                      userSelect: 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <div style={{ 
-                        padding: '0.75rem', 
-                        borderRadius: 'var(--radius-md)', 
-                        background: hasAlert ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 43, 144, 0.05)',
-                        color: hasAlert ? '#f59e0b' : 'var(--primary)'
-                      }}>
-                        <CatIcon size={24} />
-                      </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
-                          {cat}
-                        </h3>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                          {catItems.length} registros totales
-                        </div>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <ChevronRight
+                        size={18}
+                        style={{
+                          color: 'var(--text-muted)',
+                          transform: isExpanded ? 'rotate(90deg)' : 'none',
+                          transition: 'transform 0.15s ease'
+                        }}
+                      />
+                      <strong style={{ fontSize: '0.98rem', color: 'var(--text-main)' }}>{categoryName}</strong>
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                        {catItems.length} {catItems.length === 1 ? 'artículo' : 'artículos'}
+                      </span>
                     </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                      {isPlantMode ? (
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-                            Equipos en Operación
-                          </div>
-                          <div style={{ 
-                            fontSize: '1.35rem', 
-                            fontWeight: 800, 
-                            color: '#10b981',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            justifyContent: 'flex-end'
-                          }}>
-                            <CheckCircle2 size={18} />
-                            {totalInUse} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' }}>en uso</span>
-                          </div>
-                        </div>
-                      ) : isConsumable ? (
-                        consumablesLow > 0 && (
-                          <span className="badge badge-warning" style={{ padding: '0.4rem 0.75rem' }}>
-                            <AlertTriangle size={14} /> {consumablesLow} items con bajo stock
-                          </span>
-                        )
-                      ) : (
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-                            Disponibles Almacén IT
-                          </div>
-                          <div style={{ 
-                            fontSize: '1.4rem', 
-                            fontWeight: 800, 
-                            color: isLow ? '#f59e0b' : '#10b981',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            justifyContent: 'flex-end'
-                          }}>
-                            {isLow && <AlertTriangle size={18} />}
-                            {availableStock} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' }}>/ {targetMin} mín.</span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div style={{ color: 'var(--text-dim)', paddingLeft: '0.5rem', borderLeft: '1px solid var(--border-color)' }}>
-                        {isExpanded ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
-                      </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        Stock Total: <strong style={{ color: 'var(--text-main)' }}>{catItems.reduce((s, i) => s + i.stock, 0)}</strong>
+                      </span>
                     </div>
                   </div>
 
+                  {/* Items Table */}
                   {isExpanded && (
-                    <div style={{ borderTop: '1px solid var(--border-color)' }}>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', background: 'var(--bg-card)' }}>
-                              <th style={{ padding: '0.75rem 1rem', width: '40px' }}></th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Equipo / Modelo</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Planta</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>N° Serie & IP</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Garantía</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Área / Asignado</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>{isPlantMode ? 'Unidades en Uso' : 'Stock Almacén'}</th>
-                              <th style={{ padding: '0.75rem 1rem' }}>Código QR</th>
-                              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {catItems.map((item) => {
-                              const isLowStock = !isPlantMode && (isConsumable ? ((item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock)) : false);
-                              return (
-                                <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    <input 
-                                      type="checkbox"
-                                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                      checked={selectedItemIds.has(item.id)}
-                                      onChange={(e) => {
-                                        const newSet = new Set(selectedItemIds);
-                                        if (e.target.checked) newSet.add(item.id);
-                                        else newSet.delete(item.id);
-                                        setSelectedItemIds(newSet);
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)' }}>
+                            <th style={{ padding: '0.75rem 1rem', width: '40px' }}>
+                              <input
+                                type="checkbox"
+                                checked={catItems.every(i => selectedItemIds.has(i.id))}
+                                onChange={(e) => {
+                                  const updated = new Set(selectedItemIds);
+                                  catItems.forEach(i => {
+                                    if (e.target.checked) updated.add(i.id);
+                                    else updated.delete(i.id);
+                                  });
+                                  setSelectedItemIds(updated);
+                                }}
+                              />
+                            </th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Artículo / SKU</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Modelo & Serie</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>
+                              {activeTab === 'ASSIGNED' ? 'Colaborador Asignado' : activeTab === 'TRANSFERS' ? 'Ubicación vs Origen' : activeTab === 'SCRAP' ? 'Motivo de Baja' : 'Stock'}
+                            </th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Planta / Área</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {catItems.map((item) => (
+                            <tr
+                              key={item.id}
+                              style={{
+                                borderBottom: '1px solid var(--border-color)',
+                                background: selectedItemIds.has(item.id) ? 'rgba(0, 43, 144, 0.08)' : undefined
+                              }}
+                            >
+                              {/* Checkbox */}
+                              <td style={{ padding: '0.75rem 1rem' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItemIds.has(item.id)}
+                                  onChange={(e) => {
+                                    const updated = new Set(selectedItemIds);
+                                    if (e.target.checked) updated.add(item.id);
+                                    else updated.delete(item.id);
+                                    setSelectedItemIds(updated);
+                                  }}
+                                />
+                              </td>
+
+                              {/* Name & SKU */}
+                              <td style={{ padding: '0.75rem 1rem' }}>
+                                <div
+                                  onClick={() => setViewingItem(item)}
+                                  style={{ fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer' }}
+                                  className="hover-underline"
+                                >
+                                  {item.name}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--coficab-copper)', fontWeight: 700 }}>
+                                  {item.sku}
+                                </div>
+                              </td>
+
+                              {/* Model & Serial */}
+                              <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                                <div>{item.model || 'S/M'}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>S/N: {item.serialNumber || 'N/A'}</div>
+                              </td>
+
+                              {/* Dynamic Column by Tab */}
+                              <td style={{ padding: '0.75rem 1rem' }}>
+                                {activeTab === 'ASSIGNED' && (
+                                  <div>
+                                    <strong style={{ color: 'var(--text-main)' }}>{item.assignedTo || 'No especificado'}</strong>
+                                    {item.assignedBadge && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Nómina: #{item.assignedBadge}</div>}
+                                  </div>
+                                )}
+                                {activeTab === 'AVAILABLE' && (
+                                  <div>
+                                    <strong style={{ color: item.stock <= item.minStock && item.minStock > 0 ? '#f59e0b' : '#10b981', fontSize: '0.95rem' }}>
+                                      {item.stock} {item.unit}
+                                    </strong>
+                                    {item.minStock > 0 && (
+                                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Mínimo: {item.minStock}</div>
+                                    )}
+                                  </div>
+                                )}
+                                {activeTab === 'SCRAP' && (
+                                  <div>
+                                    <span className="badge badge-outbound" style={{ fontSize: '0.7rem' }}>Baja / Scrap</span>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                      {item.decommissionReason || 'Desincorporado'} {item.decommissionActNumber ? `(${item.decommissionActNumber})` : ''}
+                                    </div>
+                                  </div>
+                                )}
+                                {activeTab === 'TRANSFERS' && (
+                                  <div>
+                                    <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.plant}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                      Origen: <strong>{item.originPlant || 'Planta 2'}</strong>
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Plant / Location */}
+                              <td style={{ padding: '0.75rem 1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-main)' }}>
+                                  <MapPin size={14} style={{ color: 'var(--primary)' }} />
+                                  <span>{item.plant}</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  {item.location || item.area || (item.isITInternal ? 'Taller IT' : 'Piso Operativo')}
+                                </div>
+                              </td>
+
+                              {/* Actions Column */}
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.35rem' }}>
+                                  {/* Action: Assign to Collaborator (AVAILABLE tab) */}
+                                  {activeTab === 'AVAILABLE' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      onClick={() => setAssigningItem(item)}
+                                      title="Asignar equipo a colaborador con Responsiva Digital"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                                    >
+                                      <FileText size={14} /> Asignar
+                                    </button>
+                                  )}
+
+                                  {/* Action: Unassign / Return to IT (ASSIGNED tab) */}
+                                  {activeTab === 'ASSIGNED' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => handleUnassignItem(item)}
+                                      title="Retirar equipo y devolver al taller de IT"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--coficab-copper)' }}
+                                    >
+                                      <Undo2 size={14} /> Devolver
+                                    </button>
+                                  )}
+
+                                  {/* Action: Plant Transfer */}
+                                  {activeTab !== 'SCRAP' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => {
+                                        setTransferringItem(item);
+                                        setTargetPlant(item.plant === 'Planta 2' ? 'Planta UPCAST' : 'Planta 2');
                                       }}
-                                    />
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{item.name}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--coficab-blue-bright)', fontFamily: 'monospace' }}>
-                                      SKU: {item.sku} {item.model ? `| Mod: ${item.model}` : ''}
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    {item.isITInternal ? (
-                                      <span className="badge" style={{
-                                        background: 'rgba(201, 138, 75, 0.25)',
-                                        color: 'var(--coficab-copper)',
-                                        border: '1px solid var(--coficab-copper)',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 800
-                                      }}>
-                                        Interno IT
-                                      </span>
-                                    ) : (
-                                      <span className="badge" style={{
-                                        background: item.plant === 'Planta UPCAST' ? 'rgba(201, 138, 75, 0.2)' : 'rgba(37, 99, 235, 0.2)',
-                                        color: item.plant === 'Planta UPCAST' ? 'var(--coficab-copper)' : '#60a5fa',
-                                        border: item.plant === 'Planta UPCAST' ? '1px solid var(--coficab-copper)' : '1px solid #3b82f6',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 800
-                                      }}>
-                                        {item.plant || 'Planta 2'}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                    <div>{item.serialNumber ? `S/N: ${item.serialNumber}` : '-'}</div>
-                                    <div style={{ fontSize: '0.78rem', color: 'var(--coficab-copper)', fontFamily: 'monospace' }}>
-                                      {item.ipAddress ? `IP: ${item.ipAddress}` : ''}
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    {item.hasWarranty ? (
-                                      <span className="badge badge-inbound" style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>
-                                        <ShieldCheck size={12} /> Vigente {item.warrantyExpiration ? `(${item.warrantyExpiration})` : ''}
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
-                                        Sin Garantía
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                    {item.area ? (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.2rem' }}>
-                                        <MapPin size={14} style={{ color: 'var(--primary)' }} />
-                                        {item.area}
-                                      </div>
-                                    ) : null}
-                                    {item.assignedTo ? (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--coficab-copper)', fontWeight: 600 }}>
-                                        <User size={14} />
-                                        {item.assignedTo}
-                                      </div>
-                                    ) : null}
-                                    {!item.area && !item.assignedTo && '-'}
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    {isPlantMode ? (
-                                      <span style={{
-                                        fontWeight: 800,
-                                        fontSize: '0.95rem',
-                                        color: item.stock > 0 ? '#10b981' : 'var(--text-muted)'
-                                      }}>
-                                        {item.stock} {item.stock === 1 ? 'unidad' : 'unidades'}
-                                      </span>
-                                    ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                        <span style={{
-                                          fontWeight: 800,
-                                          fontSize: '1rem',
-                                          color: isLowStock ? '#d97706' : '#10b981'
-                                        }}>
-                                          {item.stock} {item.unit || 'unidad'}{item.stock !== 1 ? 's' : ''}
-                                        </span>
-                                        {isLowStock && (
-                                          <span className="badge badge-warning" style={{ fontSize: '0.65rem' }}>
-                                            Bajo Stock
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem' }}>
-                                    <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
-                                      <button
-                                        className="btn btn-secondary"
-                                        onClick={() => setSelectedQRItem(item)}
-                                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', width: '100%' }}
-                                      >
-                                        <QrCode size={14} />
-                                        Etiqueta QR
-                                      </button>
+                                      title="Trasladar a otra planta"
+                                      style={{ padding: '0.35rem 0.55rem' }}
+                                    >
+                                      <Truck size={14} />
+                                    </button>
+                                  )}
 
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                                    <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
-                                      <button
-                                        className="btn btn-secondary"
-                                        onClick={() => setTimelineItem(item)}
-                                        title="Ver Línea del Tiempo del Ciclo de Vida"
-                                        style={{ padding: '0.35rem 0.55rem' }}
-                                      >
-                                        <Clock size={15} style={{ color: 'var(--coficab-blue-bright)' }} />
-                                      </button>
+                                  {/* Action: Reactivate (SCRAP tab only) */}
+                                  {activeTab === 'SCRAP' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => handleReactivateItem(item)}
+                                      title="Reactivar activo al Inventario Disponible"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                                    >
+                                      <RotateCcw size={14} /> Reactivar
+                                    </button>
+                                  )}
 
-                                      <button
-                                        className="btn btn-secondary"
-                                        onClick={() => setViewingItem(item)}
-                                        title="Ver detalles completos"
-                                        style={{ padding: '0.35rem 0.55rem' }}
-                                      >
-                                        <Eye size={15} />
-                                      </button>
+                                  {/* Action: QR Modal */}
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setSelectedQRItem(item)}
+                                    title="Ver Código QR"
+                                    style={{ padding: '0.35rem 0.55rem' }}
+                                  >
+                                    <QrCode size={14} />
+                                  </button>
 
-                                      {isAdmin && (
-                                        <>
-                                          <button
-                                            className="btn btn-secondary"
-                                            onClick={() => setEditingItem(item)}
-                                            title="Editar todas las opciones del equipo"
-                                            style={{ padding: '0.35rem 0.55rem' }}
-                                          >
-                                            <Edit size={15} />
-                                          </button>
+                                  {/* Action: Edit */}
+                                  {isAdmin && activeTab !== 'SCRAP' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => setEditingItem(item)}
+                                      title="Editar Artículo"
+                                      style={{ padding: '0.35rem 0.55rem' }}
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                  )}
 
-                                          {item.status !== 'DECOMMISSIONED' ? (
-                                            <button
-                                              className="btn btn-secondary"
-                                              onClick={() => setDecommissionItem(item)}
-                                              title="Dar de baja / Enviar a Scrap"
-                                              style={{ padding: '0.35rem 0.55rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
-                                            >
-                                              <Trash2 size={15} />
-                                            </button>
-                                          ) : (
-                                            <button
-                                              className="btn btn-success"
-                                              onClick={() => handleReactivateItem(item)}
-                                              title="Reactivar activo al inventario"
-                                              style={{ padding: '0.35rem 0.55rem' }}
-                                            >
-                                              <RotateCcw size={15} />
-                                            </button>
-                                          )}
+                                  {/* Action: Decommission / Scrap (In AVAILABLE, ASSIGNED, TRANSFERS) */}
+                                  {isAdmin && activeTab !== 'SCRAP' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => setDecommissionItem(item)}
+                                      title="Dar de Baja / Enviar a Scrap"
+                                      style={{ padding: '0.35rem 0.55rem', color: '#f43f5e' }}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
 
-                                          <button
-                                            className="btn btn-danger"
-                                            onClick={() => handleDeleteItem(item.id, item.name)}
-                                            title="Eliminar artículo permanentemente"
-                                            style={{ padding: '0.35rem 0.55rem' }}
-                                          >
-                                            <X size={15} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                  {/* Action: Permanent Delete ONLY in SCRAP tab */}
+                                  {isAdmin && activeTab === 'SCRAP' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => setPermanentDeleteItem(item)}
+                                      title="Eliminar Definitivamente de la Base de Datos"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: '#ef4444' }}
+                                    >
+                                      <Trash2 size={14} /> Purgar BD
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
               );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Excel Import Modal */}
-      {showImportModal && (
-        <ExcelImportModal
-          onClose={() => setShowImportModal(false)}
-          onSuccess={fetchItems}
-        />
+            })
+          )}
+        </div>
       )}
 
-      {/* Inventory Printable / PDF Report Modal */}
-      {showReportModal && (
-        <InventoryReportModal
-          items={items}
-          totalCount={items.length}
-          filters={{
-            category: selectedCategory,
-            plant: selectedPlant,
-            searchQuery,
-            isITInternal: inventoryTab === 'IT',
-            status: statusFilter
-          }}
-          onClose={() => setShowReportModal(false)}
-        />
-      )}
+      {/* ========================================================================= */}
+      {/* MODALS SECTION                                                            */}
+      {/* ========================================================================= */}
 
-      {/* Item Detail Modal */}
-      {viewingItem && (
-        <ItemDetailModal
-          item={viewingItem}
-          isAdmin={isAdmin}
-          onClose={() => setViewingItem(null)}
-          onEdit={(item) => {
-            setViewingItem(null);
-            setEditingItem(item);
-          }}
-          onOpenTimeline={(item) => {
-            setViewingItem(null);
-            setTimelineItem(item);
-          }}
-          onOpenDecommission={(item) => {
-            setViewingItem(null);
-            setDecommissionItem(item);
-          }}
-          onReactivate={(item) => {
-            setViewingItem(null);
-            handleReactivateItem(item);
-          }}
-        />
-      )}
-
-      {/* Decommission Modal */}
-      {decommissionItem && (
-        <DecommissionModal
-          item={decommissionItem}
-          onClose={() => setDecommissionItem(null)}
-          onSuccess={(updated, msg) => {
-            setDecommissionItem(null);
-            setActionSuccessMsg(msg);
+      {/* 1. Responsiva Modal (Assignment Flow) */}
+      {assigningItem && (
+        <ResponsivaModal
+          isOpen={Boolean(assigningItem)}
+          onClose={() => setAssigningItem(null)}
+          item={assigningItem}
+          onSuccess={() => {
+            setAssigningItem(null);
+            setActionSuccessMsg(`¡Equipo asignado exitosamente y trasladado a Inventario Asignado!`);
             fetchItems();
           }}
         />
       )}
 
-      {/* Asset Lifecycle Timeline Modal */}
-      {timelineItem && (
-        <AssetTimelineModal
-          item={timelineItem}
-          onClose={() => setTimelineItem(null)}
+      {/* 2. QR Modal */}
+      {selectedQRItem && (
+        <QRModal
+          onClose={() => setSelectedQRItem(null)}
+          item={selectedQRItem}
         />
       )}
 
-      {/* Item Edit Modal */}
+      {/* 3. Item Detail Modal */}
+      {viewingItem && (
+        <ItemDetailModal
+          item={viewingItem}
+          isAdmin={isAdmin}
+          onClose={() => setViewingItem(null)}
+          onEdit={(it: Item) => {
+            setViewingItem(null);
+            setEditingItem(it);
+          }}
+          onOpenTimeline={(it: Item) => {
+            setViewingItem(null);
+            setTimelineItem(it);
+          }}
+          onOpenDecommission={(it: Item) => {
+            setViewingItem(null);
+            setDecommissionItem(it);
+          }}
+          onReactivate={(it: Item) => {
+            setViewingItem(null);
+            handleReactivateItem(it);
+          }}
+        />
+      )}
+
+      {/* 4. Item Edit Modal */}
       {editingItem && (
         <ItemEditModal
           item={editingItem}
@@ -951,71 +1209,286 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         />
       )}
 
-      {selectedQRItem && (
-        <QRModal
-          onClose={() => setSelectedQRItem(null)}
-          item={selectedQRItem}
+      {/* 5. Decommission / Scrap Modal */}
+      {decommissionItem && (
+        <DecommissionModal
+          item={decommissionItem}
+          onClose={() => setDecommissionItem(null)}
+          onSuccess={() => {
+            setDecommissionItem(null);
+            setActionSuccessMsg(`Equipo enviado a Bajas / Scrap correctamente.`);
+            fetchItems();
+          }}
         />
       )}
 
-      {/* Thermal Labels Print Modal (Zebra / Dymo) */}
-      <ThermalLabelModal
-        isOpen={!!thermalItems}
-        onClose={() => setThermalItems(null)}
-        items={thermalItems || []}
-      />
+      {/* 6. Timeline Modal */}
+      {timelineItem && (
+        <AssetTimelineModal
+          item={timelineItem}
+          onClose={() => setTimelineItem(null)}
+        />
+      )}
 
-      {selectedItemIds.size > 0 && (
-        <div style={{
-          position: 'fixed',
-          bottom: '2rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'var(--bg-card)',
-          padding: '1rem 1.5rem',
-          borderRadius: 'var(--radius-full)',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem',
-          zIndex: 100,
-          border: '1px solid var(--border-color)',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>
-            {selectedItemIds.size} equipos seleccionados
+      {/* 7. Thermal Label Modal */}
+      {thermalItems && (
+        <ThermalLabelModal
+          isOpen={Boolean(thermalItems)}
+          onClose={() => setThermalItems(null)}
+          items={thermalItems}
+        />
+      )}
+
+      {/* 8. Inventory Report Modal */}
+      {showReportModal && (
+        <InventoryReportModal
+          items={items}
+          totalCount={items.length}
+          filters={{
+            category: selectedCategory || undefined,
+            plant: selectedPlant || undefined,
+            searchQuery: searchQuery || undefined,
+            isITInternal: activeTab === 'AVAILABLE',
+            status: activeTab === 'SCRAP' ? 'DECOMMISSIONED' : 'ACTIVE'
+          }}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
+
+      {/* 9. Plant Transfer Modal */}
+      {transferringItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '460px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Truck size={20} style={{ color: '#0ea5e9' }} /> Traslado de Planta
+              </h3>
+              <button onClick={() => setTransferringItem(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteTransfer}>
+              <div style={{ marginBottom: '1rem', padding: '0.85rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{transferringItem.name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--coficab-copper)', marginTop: '0.15rem' }}>SKU: {transferringItem.sku}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Planta Actual: <strong>{transferringItem.plant}</strong> | Origen: <strong>{transferringItem.originPlant || 'Planta 2'}</strong>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Planta de Destino *</label>
+                <select
+                  className="form-input"
+                  value={targetPlant}
+                  onChange={(e) => setTargetPlant(e.target.value)}
+                  required
+                >
+                  <option value="Planta 2">Planta 2 (Principal)</option>
+                  <option value="Planta UPCAST">Planta UPCAST</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Motivo u Observaciones del Traslado</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  placeholder="ej. Reubicación temporal por soporte técnico..."
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setTransferringItem(null)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={transferring} style={{ background: '#0ea5e9', fontWeight: 700 }}>
+                  {transferring ? 'Trasladando...' : 'Confirmar Traslado'}
+                </button>
+              </div>
+            </form>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-primary"
-              onClick={() => {
-                const itemsToPrint = items.filter(i => selectedItemIds.has(i.id));
-                setThermalItems(itemsToPrint);
-              }}
-              style={{ background: 'linear-gradient(135deg, #c98a4b 0%, #b07238 100%)', fontWeight: 800, gap: '0.4rem' }}
-            >
-              <Tag size={17} />
-              Etiquetas Térmicas ({selectedItemIds.size})
-            </button>
+        </div>
+      )}
 
-            <button 
-              className="btn btn-secondary"
-              onClick={() => {
-                const itemsToPrint = items.filter(i => selectedItemIds.has(i.id));
-                printQRLabels(itemsToPrint);
-                setSelectedItemIds(new Set());
-              }}
-            >
-              <Printer size={18} />
-              Imprimir Lote Carta
-            </button>
+      {/* 10. Permanent Delete Safety Confirmation Modal (ONLY in SCRAP) */}
+      {permanentDeleteItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px', borderColor: '#ef4444' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#ef4444', marginBottom: '1rem' }}>
+              <AlertTriangle size={26} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>¿Eliminar Definitivamente?</h3>
+            </div>
 
-            <button 
-              className="btn btn-secondary"
-              onClick={() => setSelectedItemIds(new Set())}
-            >
-              Cancelar
-            </button>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+              Estás a punto de eliminar de forma <strong>irreversible</strong> el activo <strong style={{ color: '#ef4444' }}>{permanentDeleteItem.name} ({permanentDeleteItem.sku})</strong> y todo su historial de la base de datos PostgreSQL.
+            </div>
+
+            <div style={{ padding: '0.85rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: '#ef4444', marginBottom: '1.5rem' }}>
+              ⚠️ Esta acción no se puede deshacer. Todos los registros de transacciones, mantenimientos y responsivas asociadas a este activo serán eliminados permanentemente.
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setPermanentDeleteItem(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmPermanentDelete}
+                style={{ background: '#ef4444', borderColor: '#ef4444', fontWeight: 800 }}
+              >
+                Sí, Eliminar de la Base de Datos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. New Loan Modal */}
+      {showNewLoanModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <ArrowRightLeft size={20} style={{ color: '#6366f1' }} /> Registrar Préstamo de Equipo IT
+              </h3>
+              <button onClick={() => setShowNewLoanModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateLoan}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Seleccionar Equipo a Prestar *</label>
+                <select
+                  className="form-input"
+                  value={selectedLoanItemId}
+                  onChange={(e) => setSelectedLoanItemId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Seleccione un equipo disponible --</option>
+                  {items.map((it) => (
+                    <option key={it.id} value={it.id}>
+                      {it.name} ({it.sku}) - {it.plant}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Nombre del Solicitante *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ej. Juan Perez"
+                    value={borrowerName}
+                    onChange={(e) => setBorrowerName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Nómina / Badge</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ej. 10452"
+                    value={borrowerBadge}
+                    onChange={(e) => setBorrowerBadge(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Área / Departamento</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ej. Calidad / Mantenimiento"
+                    value={borrowerArea}
+                    onChange={(e) => setBorrowerArea(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Fecha y Hora de Devolución *</label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={expectedReturnDate}
+                    onChange={(e) => setExpectedReturnDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Notas del Préstamo</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  placeholder="ej. Se entrega con cargador y mouse..."
+                  value={loanNotes}
+                  onChange={(e) => setLoanNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowNewLoanModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingLoan} style={{ background: '#6366f1', fontWeight: 700 }}>
+                  {submittingLoan ? 'Guardando...' : 'Confirmar Préstamo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 12. Loan Return Modal */}
+      {loanReturnTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '460px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <CheckCircle2 size={20} style={{ color: '#10b981' }} /> Confirmar Devolución de Préstamo
+              </h3>
+              <button onClick={() => setLoanReturnTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmLoanReturn}>
+              <div style={{ padding: '0.85rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                <div>Equipo: <strong style={{ color: 'var(--text-main)' }}>{loanReturnTarget.item?.name}</strong></div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Solicitante: <strong>{loanReturnTarget.borrowerName}</strong> ({loanReturnTarget.borrowerArea || 'Planta'})</div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Estado del Equipo al Recibir / Observaciones</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  placeholder="ej. Equipo entregado en perfecto estado con accesorios completos..."
+                  value={loanReturnNotes}
+                  onChange={(e) => setLoanReturnNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setLoanReturnTarget(null)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={returningLoan} style={{ background: '#10b981', fontWeight: 700 }}>
+                  {returningLoan ? 'Guardando...' : 'Confirmar Devolución'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

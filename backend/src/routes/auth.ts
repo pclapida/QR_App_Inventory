@@ -21,11 +21,14 @@ const loginLimiter = rateLimit({
 // POST /api/auth/login
 router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
-    const { identifier, password } = req.body;
+    const rawIdentifier = req.body.identifier || req.body.username || req.body.email;
+    const { password } = req.body;
 
-    if (!identifier || !password) {
+    if (!rawIdentifier || !password) {
       return res.status(400).json({ error: 'Por favor, ingrese usuario/correo y contraseña' });
     }
+
+    const identifier = String(rawIdentifier).trim();
 
     // Search by email or username
     const user = await prisma.user.findFirst({

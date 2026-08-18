@@ -7,6 +7,7 @@ interface ResponsivaModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: Item | null;
+  onSuccess?: () => void;
 }
 
 export interface ResponsivaData {
@@ -245,12 +246,12 @@ ${photosHtml}
   win.document.close();
 }
 
-// ─── Preview Component ───────────────────────────────────────────────────────
 const DocumentPreview: React.FC<{
   item: Item;
   data: ResponsivaData;
   onBack: () => void;
-}> = ({ item, data, onBack }) => {
+  onSuccess?: () => void;
+}> = ({ item, data, onBack, onSuccess }) => {
   const [printing, setPrinting] = useState(false);
 
   const handlePrint = async () => {
@@ -271,6 +272,7 @@ const DocumentPreview: React.FC<{
         console.error("No se pudo guardar el historial de la responsiva", err);
       });
 
+      onSuccess?.();
       await openPrintWindow(item, data);
     } finally {
       setPrinting(false);
@@ -405,7 +407,7 @@ const DocumentPreview: React.FC<{
 };
 
 // ─── Main Modal ──────────────────────────────────────────────────────────────
-export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClose, item }) => {
+export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClose, item, onSuccess }) => {
   const [step, setStep] = useState<'form' | 'preview'>('form');
   const [generatedData, setGeneratedData] = useState<ResponsivaData | null>(null);
 
@@ -460,7 +462,7 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
   };
 
   if (step === 'preview' && generatedData) {
-    return <DocumentPreview item={item} data={generatedData} onBack={() => setStep('form')} />;
+    return <DocumentPreview item={item} data={generatedData} onBack={() => setStep('form')} onSuccess={onSuccess} />;
   }
 
   return (

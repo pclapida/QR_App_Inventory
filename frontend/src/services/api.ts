@@ -23,8 +23,12 @@ export interface Item {
   hasWarranty?: boolean;
   warrantyExpiration?: string;
   plant?: string;
+  originPlant?: string;
   isITInternal?: boolean;
   assignedTo?: string;
+  assignedDate?: string;
+  assignedArea?: string;
+  assignedBadge?: string;
   status?: 'ACTIVE' | 'DECOMMISSIONED';
   decommissionDate?: string;
   decommissionReason?: string;
@@ -131,11 +135,35 @@ export type PurchaseOrder = Requisition;
 export const itemsApi = {
   getAll: async (params?: any) => {
     const res = await api.get('/items', { params });
-    return res.data as Item[];
+    return res.data;
   },
   getById: async (id: string) => {
     const res = await api.get(`/items/${id}`);
     return res.data as Item;
+  },
+  assign: async (id: string, data: any) => {
+    const res = await api.post(`/items/${id}/assign`, data);
+    return res.data as { message: string; item: Item };
+  },
+  unassign: async (id: string, data?: { notes?: string }) => {
+    const res = await api.post(`/items/${id}/unassign`, data || {});
+    return res.data as { message: string; item: Item };
+  },
+  decommission: async (id: string, data: { reason: string; notes?: string; responsiblePerson?: string; disposalMethod?: string }) => {
+    const res = await api.post(`/items/${id}/decommission`, data);
+    return res.data as { message: string; item: Item };
+  },
+  reactivate: async (id: string, data?: { newStock?: number; notes?: string }) => {
+    const res = await api.post(`/items/${id}/reactivate`, data || {});
+    return res.data as { message: string; item: Item };
+  },
+  transfer: async (id: string, data: { targetPlant: string; notes?: string }) => {
+    const res = await api.post(`/items/${id}/transfer`, data);
+    return res.data as { message: string; item: Item };
+  },
+  deletePermanent: async (id: string) => {
+    const res = await api.delete(`/items/${id}`);
+    return res.data as { message: string };
   }
 };
 

@@ -63,7 +63,8 @@ export const NotificationCenter: React.FC = () => {
 
       // 2. Fetch Low Stock & Warranty Alerts from Items
       try {
-        const items = await itemsApi.getAll();
+        const itemsRes = await itemsApi.getAll();
+        const items: Item[] = Array.isArray(itemsRes) ? itemsRes : (itemsRes?.items || []);
         items.forEach((item: Item) => {
           // Low stock alert for consumable / spare parts
           if (item.minStock > 0 && item.stock <= item.minStock && item.status !== 'DECOMMISSIONED') {

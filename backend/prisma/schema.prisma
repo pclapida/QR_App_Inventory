@@ -42,9 +42,13 @@ model Item {
   plant              String        @default("Planta 2")
   isITInternal       Boolean       @default(false)
   customAttributes   String?
-  bitlockerKey       String?
-  devicePassword     String?
+  bitlockerKey          String?
+  devicePassword        String?
+  originPlant           String?       @default("Planta 2")
   assignedTo            String?
+  assignedDate          DateTime?
+  assignedArea          String?
+  assignedBadge         String?
   status                String        @default("ACTIVE")
   decommissionDate      DateTime?
   decommissionReason    String?

@@ -34,12 +34,9 @@ const cleanKey = (key: string): string => {
 };
 
 const determinePlant = (name: string, sku: string, model: string, defaultPlant: string): string => {
-  const text = `${name || ''} ${sku || ''} ${model || ''}`.toLowerCase();
-  if (text.includes('cofmx')) return 'Planta 1';
-  if (text.includes('cofdg')) return 'Planta 2';
-  if (text.includes('cofud')) return 'Planta UPCAST';
-  if (text.includes('cofd3')) return 'Planta 3';
-  return defaultPlant;
+  const text = `${name || ''} ${sku || ''} ${model || ''} ${defaultPlant || ''}`.toLowerCase();
+  if (text.includes('upcast') || text.includes('cofud')) return 'Planta UPCAST';
+  return 'Planta 2';
 };
 
 const determineCategory = (name: string, model: string, defaultCategory: string): string => {
@@ -185,19 +182,36 @@ router.post('/import-excel', requireAdmin, upload.single('file'), async (req: Au
 // GET /api/items - List all items with optional pagination and filters
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { q, category, plant, isITInternal, status, page, limit } = req.query;
+    const { q, category, plant, isITInternal, status, tab, page, limit } = req.query;
     const whereClause: any = {};
 
-    if (status && typeof status === 'string' && status.trim() !== '') {
-      if (status.toUpperCase() !== 'ALL') {
-        whereClause.status = status.toUpperCase();
-      }
-    } else {
+    // Tab-based filtering for the 5-state lifecycle
+    if (tab === 'ASSIGNED') {
       whereClause.status = 'ACTIVE';
-    }
+      whereClause.isITInternal = false;
+    } else if (tab === 'AVAILABLE') {
+      whereClause.status = 'ACTIVE';
+      whereClause.isITInternal = true;
+    } else if (tab === 'SCRAP') {
+      whereClause.status = 'DECOMMISSIONED';
+    } else if (tab === 'TRANSFERS') {
+      whereClause.status = 'ACTIVE';
+      whereClause.OR = [
+        { plant: 'Planta UPCAST' },
+        { originPlant: { not: null } }
+      ];
+    } else {
+      if (status && typeof status === 'string' && status.trim() !== '') {
+        if (status.toUpperCase() !== 'ALL') {
+          whereClause.status = status.toUpperCase();
+        }
+      } else {
+        whereClause.status = 'ACTIVE';
+      }
 
-    if (isITInternal !== undefined && isITInternal !== '') {
-      whereClause.isITInternal = isITInternal === 'true' || isITInternal === '1';
+      if (isITInternal !== undefined && isITInternal !== '') {
+        whereClause.isITInternal = isITInternal === 'true' || isITInternal === '1';
+      }
     }
 
     if (category && typeof category === 'string' && category.trim() !== '') {
@@ -449,6 +463,8 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
       customAttrStr = typeof customAttributes === 'string' ? customAttributes : JSON.stringify(customAttributes);
     }
 
+    const itemPlant = determinePlant(name.trim(), finalSku, model ? model.trim() : '', plant ? plant.trim() : 'Planta 2');
+
     const item = await prisma.item.create({
       data: {
         id: newItemId,
@@ -464,16 +480,17 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
         warrantyExpiration: warrantyExpiration ? warrantyExpiration.trim() : null,
         description: description ? description.trim() : null,
         category: determineCategory(name.trim(), model ? model.trim() : '', category ? category.trim() : 'Equipos & Dispositivos'),
-        plant: determinePlant(name.trim(), finalSku, model ? model.trim() : '', plant ? plant.trim() : 'Planta 2'),
-        isITInternal: isIT,
-        assignedTo: assignedTo ? assignedTo.trim() : null,
+        plant: itemPlant,
+        originPlant: itemPlant,
+        isITInternal: true, // Always enters IT Available Inventory
+        assignedTo: null,
         customAttributes: customAttrStr,
         bitlockerKey: bitlockerKey ? bitlockerKey.trim() : null,
         devicePassword: devicePassword ? devicePassword.trim() : null,
         stock: typeof stock === 'number' ? stock : parseInt(stock || '1', 10),
         minStock: typeof minStock === 'number' ? minStock : parseInt(minStock || '1', 10),
         unit: unit ? unit.trim() : 'unidad',
-        location: location ? location.trim() : (isIT ? 'Taller Interno IT' : (area ? area.trim() : null)),
+        location: location ? location.trim() : 'Taller Interno IT',
         qrCodePayload
       }
     });
@@ -486,7 +503,7 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
         type: 'CREATION',
         quantity: item.stock,
         toPlant: item.plant,
-        notes: `Alta de producto registrada en ${item.plant}`
+        notes: `Alta de equipo registrado en Inventario Disponible (${item.plant})`
       }
     });
 
@@ -494,6 +511,137 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
   } catch (error: any) {
     console.error('Error al crear artículo:', error);
     return res.status(500).json({ error: 'Error al registrar el nuevo artículo' });
+  }
+});
+
+// POST /api/items/:id/assign - Assign an available IT item to a collaborator with digital responsiva
+router.post('/:id/assign', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      colaborador,
+      area,
+      badge,
+      marcaModelo,
+      serie,
+      nombreEquipo,
+      accesoriosJson,
+      observaciones,
+      photoUrlsJson,
+      signatureData,
+      email
+    } = req.body;
+
+    if (!colaborador || !colaborador.trim()) {
+      return res.status(400).json({ error: 'El nombre del colaborador es obligatorio para la asignación.' });
+    }
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          assignedTo: colaborador.trim(),
+          assignedArea: area ? area.trim() : null,
+          assignedBadge: badge ? badge.trim() : null,
+          assignedDate: new Date(),
+          area: area ? area.trim() : item.area,
+          location: area ? area.trim() : item.plant,
+          isITInternal: false,
+          status: 'ACTIVE'
+        }
+      });
+
+      // Create Responsiva Record
+      await tx.responsivaHistory.create({
+        data: {
+          itemId: id,
+          colaborador: colaborador.trim(),
+          marcaModelo: marcaModelo || `${item.name} ${item.model || ''}`.trim(),
+          serie: serie || item.serialNumber || 'N/A',
+          nombreEquipo: nombreEquipo || item.sku,
+          accesoriosJson: accesoriosJson ? (typeof accesoriosJson === 'string' ? accesoriosJson : JSON.stringify(accesoriosJson)) : '{}',
+          observaciones: observaciones ? observaciones.trim() : null,
+          photoUrlsJson: photoUrlsJson ? (typeof photoUrlsJson === 'string' ? photoUrlsJson : JSON.stringify(photoUrlsJson)) : '[]',
+          signatureData: signatureData || null,
+          email: email ? email.trim() : null,
+          emailSent: false
+        }
+      });
+
+      // Audit transaction
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'ASIGNACIÓN',
+          quantity: 1,
+          assignedTo: colaborador.trim(),
+          fromPlant: item.plant,
+          toPlant: item.plant,
+          notes: `Equipo asignado a ${colaborador.trim()} (${area || 'Sin área'}) con Responsiva digital firmada`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ message: `Equipo asignado exitosamente a ${colaborador.trim()}`, item: updatedItem });
+  } catch (error: any) {
+    console.error('Error al asignar artículo:', error);
+    return res.status(500).json({ error: 'Error al procesar la asignación del equipo.' });
+  }
+});
+
+// POST /api/items/:id/unassign - Return an assigned item back to IT Workshop (Disponible)
+router.post('/:id/unassign', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item) {
+      return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const previousOwner = item.assignedTo || 'Colaborador';
+
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      const updated = await tx.item.update({
+        where: { id },
+        data: {
+          assignedTo: null,
+          assignedArea: null,
+          assignedBadge: null,
+          assignedDate: null,
+          isITInternal: true,
+          location: 'Taller Interno IT'
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          itemId: id,
+          userId: req.user!.id,
+          type: 'DEVOLUCIÓN_IT',
+          quantity: 1,
+          fromPlant: item.plant,
+          toPlant: item.plant,
+          notes: `Retiro de equipo de ${previousOwner} y retorno a Inventario Disponible de IT. ${notes ? `Notas: ${notes}` : ''}`
+        }
+      });
+
+      return updated;
+    });
+
+    return res.json({ message: `Equipo retornado a Inventario Disponible de IT`, item: updatedItem });
+  } catch (error: any) {
+    console.error('Error al desasignar artículo:', error);
+    return res.status(500).json({ error: 'Error al devolver el artículo al inventario disponible.' });
   }
 });
 
@@ -895,11 +1043,26 @@ router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Respo
       return res.status(404).json({ error: 'Artículo no encontrado' });
     }
 
-    await prisma.item.delete({ where: { id } });
-    return res.json({ message: 'Artículo eliminado correctamente' });
+    // Safety rule: Items must be in SCRAP / DECOMMISSIONED state before being permanently purged
+    if (existing.status !== 'DECOMMISSIONED') {
+      return res.status(400).json({
+        error: 'Para eliminar permanentemente un activo de la base de datos, primero debe enviarse al apartado de Bajas / Scrap.'
+      });
+    }
+
+    // Delete associated dependencies if necessary or delete item
+    await prisma.$transaction([
+      prisma.transaction.deleteMany({ where: { itemId: id } }),
+      prisma.maintenance.deleteMany({ where: { itemId: id } }),
+      prisma.responsivaHistory.deleteMany({ where: { itemId: id } }),
+      prisma.deviceLoan.deleteMany({ where: { itemId: id } }),
+      prisma.item.delete({ where: { id } })
+    ]);
+
+    return res.json({ message: 'Artículo y su historial eliminados permanentemente de la base de datos' });
   } catch (error: any) {
-    console.error('Error al eliminar artículo:', error);
-    return res.status(500).json({ error: 'Error al eliminar el artículo' });
+    console.error('Error al eliminar artículo permanentemente:', error);
+    return res.status(500).json({ error: 'Error al eliminar el artículo de la base de datos' });
   }
 });
 

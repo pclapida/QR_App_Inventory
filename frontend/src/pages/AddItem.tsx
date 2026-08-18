@@ -167,50 +167,20 @@ export const AddItem: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '2rem' }}>
 
-        {/* Inventario de Destino: Operativo de Plantas vs Interno IT */}
-        <div style={{ marginBottom: '1.75rem', background: 'var(--bg-input)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <label className="form-label" style={{ color: 'var(--text-main)', fontWeight: 800, fontSize: '0.95rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Package size={18} style={{ color: 'var(--coficab-copper)' }} />
-            ¿A qué Inventario pertenece este Registro?
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-            <div
-              onClick={() => setIsITInternal(false)}
-              style={{
-                padding: '1rem',
-                borderRadius: 'var(--radius-md)',
-                background: !isITInternal ? 'rgba(37, 99, 235, 0.18)' : 'var(--bg-card)',
-                border: !isITInternal ? '2px solid #3b82f6' : '1px solid var(--border-color)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{ fontWeight: 800, color: !isITInternal ? '#60a5fa' : 'var(--text-main)', fontSize: '1rem' }}>
-                Inventario Operativo de Plantas
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Equipos en servicio asignados a usuarios, líneas y áreas operativas de Planta 1, 2, 3 u UPCAST.
-              </div>
-            </div>
-
-            <div
-              onClick={() => setIsITInternal(true)}
-              style={{
-                padding: '1rem',
-                borderRadius: 'var(--radius-md)',
-                background: isITInternal ? 'rgba(201, 138, 75, 0.18)' : 'var(--bg-card)',
-                border: isITInternal ? '2px solid var(--coficab-copper)' : '1px solid var(--border-color)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{ fontWeight: 800, color: isITInternal ? 'var(--coficab-copper)' : 'var(--text-main)', fontSize: '1rem' }}>
-                Inventario Interno de IT
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                Stock del taller de Sistemas, refacciones, repuestos, cables, herramientas y accesorios IT.
-              </div>
-            </div>
+        {/* Informative Banner */}
+        <div style={{
+          padding: '1rem 1.25rem',
+          background: 'rgba(201, 138, 75, 0.12)',
+          border: '1px solid rgba(201, 138, 75, 0.35)',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '1.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <Package size={22} style={{ color: 'var(--coficab-copper)', flexShrink: 0 }} />
+          <div style={{ fontSize: '0.86rem', color: 'var(--text-main)' }}>
+            <strong>Flujo de Alta:</strong> Todo equipo nuevo se registra directamente en el <strong>Inventario Disponible (Almacén IT)</strong>. Una vez ingresado, podrás asignarlo formalmente a cualquier colaborador mediante la opción <em>"Asignar"</em> con responsiva digital y firma táctil.
           </div>
         </div>
 
@@ -226,14 +196,17 @@ export const AddItem: React.FC = () => {
             >
               <option value="Equipos & Dispositivos">Equipos & Dispositivos (Activo Fijo)</option>
               <option value="Hardware & Lectores">Hardware & Lectores (Activo Fijo)</option>
-              <option value="Activo Fijo">Activo Fijo</option>
+              <option value="Laptops & Cómputo">Laptops & Cómputo</option>
+              <option value="Monitores & Pantallas">Monitores & Pantallas</option>
+              <option value="Tablets">Tablets</option>
+              <option value="Impresoras Zebra">Impresoras Zebra</option>
               <option value="Consumibles">Consumibles (Simplificado)</option>
               <option value="Herramientas">Herramientas (Simplificado)</option>
-              <option value="Maquinaria">Maquinaria</option>
+              <option value="Refacciones IT">Refacciones IT</option>
             </select>
           </div>
 
-          {/* Planta Selector (Planta 1, Planta 2, Planta 3, Planta UPCAST) */}
+          {/* Planta Selector (Planta 2, Planta UPCAST) */}
           <div className="form-group">
             <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 800 }}>Ubicación / Planta COFICAB</label>
             <select
@@ -242,9 +215,7 @@ export const AddItem: React.FC = () => {
               onChange={(e) => setPlant(e.target.value)}
               style={{ fontSize: '1.05rem', fontWeight: 700, borderColor: 'var(--primary)' }}
             >
-              <option value="Planta 1">Planta 1</option>
               <option value="Planta 2">Planta 2 (Planta Principal)</option>
-              <option value="Planta 3">Planta 3</option>
               <option value="Planta UPCAST">Planta UPCAST</option>
             </select>
           </div>
@@ -446,16 +417,7 @@ export const AddItem: React.FC = () => {
             </div>
           )}
 
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">8. Responsable / Asignado a</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Nombre de la persona (ej. Juan Perez)"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-            />
-          </div>
+
 
           {/* Observaciones */}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
