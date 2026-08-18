@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CoficabLogo } from './CoficabLogo';
+import { NotificationCenter } from './NotificationCenter';
 import {
   Package,
   PlusCircle,
@@ -19,8 +20,10 @@ import {
   Menu,
   X,
   ChevronRight,
+  ChevronDown,
   ArrowRightLeft,
-  Clock
+  Clock,
+  Layers
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -35,16 +38,34 @@ export const Navbar: React.FC = () => {
   });
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
+  const [opsDropdownOpen, setOpsDropdownOpen] = useState<boolean>(false);
+  const opsDropdownRef = useRef<HTMLDivElement>(null);
+
+  const isOpsActive = ['/maintenance', '/purchase-orders', '/responsivas-history', '/add-item'].includes(location.pathname);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('coficab_theme', theme);
   }, [theme]);
 
-  // Close mobile drawer automatically when navigating to another route
+  // Close dropdown & mobile drawer automatically when navigating to another route
   useEffect(() => {
     setMobileDrawerOpen(false);
+    setOpsDropdownOpen(false);
   }, [location.pathname]);
+
+  // Close operations dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (opsDropdownRef.current && !opsDropdownRef.current.contains(e.target as Node)) {
+        setOpsDropdownOpen(false);
+      }
+    };
+    if (opsDropdownOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [opsDropdownOpen]);
 
   // Lock body scroll when mobile drawer is open
   useEffect(() => {
@@ -58,10 +79,13 @@ export const Navbar: React.FC = () => {
     };
   }, [mobileDrawerOpen]);
 
-  // Handle ESC key to close drawer
+  // Handle ESC key to close drawer & dropdown
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileDrawerOpen(false);
+      if (e.key === 'Escape') {
+        setMobileDrawerOpen(false);
+        setOpsDropdownOpen(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -75,9 +99,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="glass-panel app-header" style={{ borderBottom: '1px solid var(--border-color)' }}>
+      <header className="glass-panel app-header" style={{ borderBottom: '1px solid var(--border-color)', padding: '0.65rem 1.25rem' }}>
         {/* Left Side: Mobile Hamburger & Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           {/* Mobile Hamburger Toggle Button */}
           <button
             type="button"
@@ -95,107 +119,164 @@ export const Navbar: React.FC = () => {
             onClick={() => navigate('/inventory')}
             title="COFICAB Inventory Home"
           >
-            <CoficabLogo height={42} showTagline={true} themeMode={theme} />
+            <CoficabLogo height={40} showTagline={true} themeMode={theme} />
           </div>
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="nav-links desktop-nav-links">
+        <nav className="nav-links desktop-nav-links" style={{ gap: '0.4rem' }}>
           <NavLink
             to="/inventory"
             end
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
           >
-            <Package size={18} />
-            Inventario Plantas
+            <Package size={17} />
+            Plantas
           </NavLink>
 
           <NavLink
             to="/inventory-it"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ color: 'var(--coficab-copper)' }}
+            style={{ color: 'var(--coficab-copper)', padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
           >
-            <Laptop size={18} />
-            Inventario Interno IT
-          </NavLink>
-
-          <NavLink
-            to="/scanner"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <Scan size={18} />
-            Escanear QR
-          </NavLink>
-
-          {isAdmin && (
-            <NavLink
-              to="/add-item"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <PlusCircle size={18} />
-              Nuevo Artículo
-            </NavLink>
-          )}
-
-          <NavLink
-            to="/maintenance"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <Wrench size={18} />
-            Mantenimiento
-          </NavLink>
-
-          <NavLink
-            to="/purchase-orders"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            title="Gestión de Requisiciones"
-          >
-            <ClipboardList size={18} />
-            Requisiciones
-          </NavLink>
-
-          <NavLink
-            to="/responsivas-history"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <FileText size={18} />
-            Responsivas
+            <Laptop size={17} />
+            Taller IT
           </NavLink>
 
           <NavLink
             to="/loans"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ color: 'var(--coficab-copper)' }}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
             title="Control de Préstamos Temporales de IT"
           >
-            <ArrowRightLeft size={18} />
+            <ArrowRightLeft size={17} style={{ color: 'var(--coficab-copper)' }} />
             Préstamos
           </NavLink>
 
+          <NavLink
+            to="/scanner"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
+          >
+            <Scan size={17} />
+            Escanear
+          </NavLink>
+
+          {/* Operations Dropdown Menu */}
+          <div ref={opsDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className={`nav-item ${isOpsActive ? 'active' : ''}`}
+              onClick={() => setOpsDropdownOpen(!opsDropdownOpen)}
+              style={{
+                background: opsDropdownOpen ? 'var(--bg-card-hover)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.45rem 0.75rem',
+                fontSize: '0.86rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <Layers size={17} style={{ color: isOpsActive ? 'var(--primary)' : 'var(--text-muted)' }} />
+              <span>Operaciones</span>
+              <ChevronDown size={14} style={{ transform: opsDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+            </button>
+
+            {opsDropdownOpen && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                minWidth: '230px',
+                background: 'var(--bg-card)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-highlight)',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(16px)',
+                zIndex: 1000,
+                padding: '0.4rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.2rem',
+                animation: 'fadeIn 0.15s ease'
+              }}>
+                <NavLink
+                  to="/maintenance"
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => setOpsDropdownOpen(false)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
+                >
+                  <Wrench size={16} style={{ color: '#f59e0b' }} />
+                  Mantenimiento Preventivo
+                </NavLink>
+
+                <NavLink
+                  to="/purchase-orders"
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => setOpsDropdownOpen(false)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
+                >
+                  <ClipboardList size={16} style={{ color: 'var(--coficab-blue-bright)' }} />
+                  Requisiciones / Compras
+                </NavLink>
+
+                <NavLink
+                  to="/responsivas-history"
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => setOpsDropdownOpen(false)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}
+                >
+                  <FileText size={16} style={{ color: 'var(--coficab-copper)' }} />
+                  Historial de Responsivas
+                </NavLink>
+
+                {isAdmin && (
+                  <NavLink
+                    to="/add-item"
+                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                    onClick={() => setOpsDropdownOpen(false)}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', borderTop: '1px solid var(--border-color)', marginTop: '0.2rem', paddingTop: '0.5rem' }}
+                  >
+                    <PlusCircle size={16} style={{ color: 'var(--primary)' }} />
+                    Registrar Nuevo Activo
+                  </NavLink>
+                )}
+              </div>
+            )}
+          </div>
+        </nav>
+
+        {/* Desktop User & Theme Controls */}
+        <div className="desktop-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {/* Notification Center Bell */}
+          <NotificationCenter />
+
+          {/* Admin Panel Quick Link */}
           {isAdmin && (
             <NavLink
               to="/admin"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              style={{ color: '#c084fc' }}
+              style={{ color: '#c084fc', padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
               title="Panel de Administración IT"
             >
-              <Shield size={18} />
+              <Shield size={17} />
               Panel
             </NavLink>
           )}
 
+          {/* TV Kiosk Mode */}
           <NavLink
             to="/tv-dashboard"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             style={{ color: '#f43f5e', padding: '0.45rem 0.65rem' }}
-            title="Modo TV Kiosk"
+            title="Modo Pantalla TV Kiosk"
           >
-            <Tv size={19} />
+            <Tv size={18} />
           </NavLink>
-        </nav>
 
-        {/* Desktop User & Theme Controls */}
-        <div className="desktop-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {/* Theme Switcher Icon-only Button */}
           <button
             className="btn btn-secondary"
@@ -205,9 +286,9 @@ export const Navbar: React.FC = () => {
             aria-label="Cambiar tema"
           >
             {theme === 'light' ? (
-              <Moon size={18} style={{ color: '#6366f1' }} />
+              <Moon size={17} style={{ color: '#6366f1' }} />
             ) : (
-              <Sun size={18} style={{ color: '#f59e0b' }} />
+              <Sun size={17} style={{ color: '#f59e0b' }} />
             )}
           </button>
 
@@ -224,20 +305,29 @@ export const Navbar: React.FC = () => {
               justifyContent: 'center',
               color: '#ffffff',
               cursor: 'default',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)'
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+              fontWeight: 800,
+              fontSize: '0.85rem'
             }}
           >
-            {isAdmin ? <Shield size={16} /> : <UserIcon size={16} />}
+            {(user?.name || user?.username || 'U').charAt(0).toUpperCase()}
           </div>
 
-          <button className="btn btn-secondary" onClick={() => { logout(); navigate('/login'); }} style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem' }}>
-            <LogOut size={16} />
+          <button
+            className="btn btn-secondary"
+            onClick={() => { logout(); navigate('/login'); }}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', gap: '0.35rem' }}
+            title="Cerrar Sesión"
+          >
+            <LogOut size={15} />
             Salir
           </button>
         </div>
 
         {/* Mobile Header Right Fast Actions */}
-        <div className="mobile-header-actions" style={{ display: 'none' }}>
+        <div className="mobile-header-actions" style={{ display: 'none', alignItems: 'center', gap: '0.4rem' }}>
+          <NotificationCenter />
+
           <button
             className="btn btn-secondary"
             onClick={() => navigate('/scanner')}
