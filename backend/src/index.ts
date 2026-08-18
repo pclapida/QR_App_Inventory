@@ -9,6 +9,7 @@ import transactionRoutes from './routes/transactions';
 import maintenanceRoutes from './routes/maintenance';
 import purchaseOrderRoutes from './routes/purchaseOrders';
 import responsivaRoutes from './routes/responsiva';
+import loanRoutes from './routes/loans';
 
 dotenv.config();
 
@@ -98,6 +99,7 @@ app.use('/api/items', transactionRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/responsivas', responsivaRoutes);
+app.use('/api/loans', loanRoutes);
 
 // Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

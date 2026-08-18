@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Camera, FileText, CheckCircle2, Printer, ChevronLeft, Eye } from 'lucide-react';
 import { Item, responsivasApi } from '../services/api';
+import { SignatureCanvas } from './SignatureCanvas';
 
 interface ResponsivaModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export interface ResponsivaData {
   };
   estado: string;
   photoUrls: string[];
+  signatureData?: string | null;
 }
 
 // Convert a blob URL to base64 data URL so it survives window.open
@@ -217,7 +219,11 @@ ${photosHtml}
 
 <div class="sig-block">
 <div class="sig-row">
-  <div class="sig-box"><strong>Firma del colaborador</strong><br>${data.colaborador}</div>
+  <div class="sig-box">
+    <strong>Firma del colaborador</strong><br>
+    ${data.signatureData ? `<img src="${data.signatureData}" style="max-height:55px;display:block;margin:4px auto;" /><small style="font-size:7pt;color:#555;">🔒 Firmado digitalmente</small><br/>` : ''}
+    ${data.colaborador}
+  </div>
   <div class="sig-box"><strong>Nombre y firma del responsable de TI</strong></div>
 </div>
 </div>
@@ -250,8 +256,7 @@ const DocumentPreview: React.FC<{
   const handlePrint = async () => {
     setPrinting(true);
     try {
-      // Guardar en el historial (si item existe y es nuevo o no lo guardamos todavia)
-      // Lo guardamos siempre que generamos una nueva impresión desde el formulario
+      // Guardar en el historial incluyendo la firma digital capturada
       await responsivasApi.create({
         itemId: item.id,
         colaborador: data.colaborador,
@@ -261,6 +266,7 @@ const DocumentPreview: React.FC<{
         accesoriosJson: JSON.stringify(data.accesorios),
         observaciones: data.estado,
         photoUrlsJson: JSON.stringify(data.photoUrls),
+        signatureData: data.signatureData
       }).catch(err => {
         console.error("No se pudo guardar el historial de la responsiva", err);
       });
@@ -377,11 +383,18 @@ const DocumentPreview: React.FC<{
             Fecha de entrega: <u>&nbsp;{today.getDate().toString().padStart(2,'0')}&nbsp;</u> / <u>&nbsp;{(today.getMonth()+1).toString().padStart(2,'0')}&nbsp;</u> / <u>&nbsp;{today.getFullYear()}&nbsp;</u>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '2rem', marginTop: 40 }}>
             <div style={{ textAlign: 'center', flex: 1, borderTop: '1px solid #000', paddingTop: 6 }}>
+              {data.signatureData && (
+                <div style={{ marginBottom: 6 }}>
+                  <img src={data.signatureData} alt="Firma digital" style={{ maxHeight: 50, maxWidth: 180, display: 'block', margin: '0 auto' }} />
+                  <small style={{ fontSize: '7pt', color: '#555', display: 'block' }}>🔒 Firmado digitalmente</small>
+                </div>
+              )}
               <strong>Firma del colaborador</strong><br/><span style={{ fontSize: '10pt' }}>{data.colaborador}</span>
             </div>
             <div style={{ textAlign: 'center', flex: 1, borderTop: '1px solid #000', paddingTop: 6 }}>
+              <br/>
               <strong>Nombre y firma del responsable de TI</strong>
             </div>
           </div>
@@ -403,6 +416,7 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
   const [accesorios, setAccesorios] = useState({ cargador: false, mouse: false, audifonos: false, adaptador: false, otro: false, otroText: '' });
   const [estado, setEstado] = useState('Buen estado general. Funciona correctamente.');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && item) {
@@ -413,6 +427,7 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
       setAccesorios({ cargador: false, mouse: false, audifonos: false, adaptador: false, otro: false, otroText: '' });
       setEstado('Buen estado general. Funciona correctamente.');
       setPhotoUrls([]);
+      setSignatureData(null);
       setStep('form');
       setGeneratedData(null);
     }
@@ -437,7 +452,8 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
       nombreEquipo: nombreEquipo.trim(),
       accesorios: { ...accesorios },
       estado: estado.trim(),
-      photoUrls: [...photoUrls]
+      photoUrls: [...photoUrls],
+      signatureData: signatureData
     };
     setGeneratedData(snapshot);
     setStep('preview');
@@ -558,6 +574,11 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
                 </label>
               )}
             </div>
+          </div>
+
+          {/* Digital Signature Canvas */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-md)', padding: '0.9rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <SignatureCanvas onSignatureChange={setSignatureData} />
           </div>
 
           <div style={{ display: 'flex', gap: '0.65rem', paddingTop: '0.25rem' }}>

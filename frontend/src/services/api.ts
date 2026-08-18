@@ -106,22 +106,6 @@ api.interceptors.response.use(
   }
 );
 
-export interface ResponsivaHistory {
-  id: string;
-  itemId: string;
-  item?: Item;
-  colaborador: string;
-  marcaModelo: string;
-  serie: string;
-  nombreEquipo: string;
-  accesoriosJson: string;
-  observaciones?: string;
-  photoUrlsJson?: string;
-  email?: string;
-  emailSent?: boolean;
-  createdAt: string;
-}
-
 export interface Requisition {
   id: string;
   reqNumber?: string;
@@ -143,18 +127,112 @@ export interface Requisition {
 
 export type PurchaseOrder = Requisition;
 
+export const itemsApi = {
+  getAll: async (params?: any) => {
+    const res = await api.get('/items', { params });
+    return res.data as Item[];
+  },
+  getById: async (id: string) => {
+    const res = await api.get(`/items/${id}`);
+    return res.data as Item;
+  }
+};
+
+export interface ResponsivaHistory {
+  id: string;
+  itemId: string;
+  item?: Item;
+  colaborador: string;
+  marcaModelo: string;
+  serie: string;
+  nombreEquipo: string;
+  accesoriosJson: string;
+  observaciones?: string;
+  photoUrlsJson?: string;
+  signatureData?: string | null;
+  email?: string;
+  emailSent?: boolean;
+  createdAt: string;
+}
+
+export interface DeviceLoan {
+  id: string;
+  itemId: string;
+  item?: Item;
+  borrowerName: string;
+  borrowerArea?: string | null;
+  borrowerBadge?: string | null;
+  loanDate: string;
+  expectedReturn: string;
+  actualReturn?: string | null;
+  status: 'ACTIVE' | 'RETURNED' | 'OVERDUE';
+  loanNotes?: string | null;
+  returnNotes?: string | null;
+  loanedBy: string;
+  receivedBy?: string | null;
+  isOverdue?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const responsivasApi = {
   getAll: async () => {
     const res = await api.get('/responsivas');
     return res.data as ResponsivaHistory[];
   },
-  create: async (data: Partial<ResponsivaHistory> & { accesoriosJson?: string; photoUrlsJson?: string }) => {
+  create: async (data: Partial<ResponsivaHistory> & { accesoriosJson?: string; photoUrlsJson?: string; signatureData?: string | null }) => {
     const res = await api.post('/responsivas', data);
     return res.data as ResponsivaHistory;
   },
   sendEmail: async (payload: { responsivaId: string | null; htmlContent: string; toEmail: string; colaborador: string; nombreEquipo: string }) => {
     const res = await api.post('/responsivas/send-email', payload);
     return res.data as { success: boolean; message: string };
+  }
+};
+
+export const loansApi = {
+  getAll: async (params?: { status?: string; itemId?: string }) => {
+    const res = await api.get('/loans', { params });
+    return res.data as DeviceLoan[];
+  },
+  create: async (data: {
+    itemId: string;
+    borrowerName: string;
+    borrowerArea?: string;
+    borrowerBadge?: string;
+    expectedReturn: string;
+    loanNotes?: string;
+  }) => {
+    const res = await api.post('/loans', data);
+    return res.data as DeviceLoan;
+  },
+  returnLoan: async (id: string, returnNotes?: string) => {
+    const res = await api.put(`/loans/${id}/return`, { returnNotes });
+    return res.data as DeviceLoan;
+  },
+  delete: async (id: string) => {
+    const res = await api.delete(`/loans/${id}`);
+    return res.data as { message: string };
+  }
+};
+
+export const adminApi = {
+  getStats: async () => {
+    const res = await api.get('/users/stats/summary');
+    return res.data.stats as {
+      users: number;
+      items: number;
+      transactions: number;
+      maintenances: number;
+      purchaseOrders: number;
+      responsivas: number;
+      deviceLoans: number;
+      totalRecords: number;
+    };
+  },
+  downloadBackup: async () => {
+    const res = await api.get('/users/backup/download', { responseType: 'blob' });
+    return res.data as Blob;
   }
 };
 

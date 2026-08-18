@@ -18,7 +18,9 @@ import {
   FileText,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  ArrowRightLeft,
+  Clock
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -158,6 +160,16 @@ export const Navbar: React.FC = () => {
           >
             <FileText size={18} />
             Responsivas
+          </NavLink>
+
+          <NavLink
+            to="/loans"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ color: 'var(--coficab-copper)' }}
+            title="Control de Préstamos Temporales de IT"
+          >
+            <ArrowRightLeft size={18} />
+            Préstamos
           </NavLink>
 
           {isAdmin && (
@@ -377,6 +389,15 @@ export const Navbar: React.FC = () => {
                   >
                     <FileText size={19} style={{ color: 'var(--coficab-copper)' }} />
                     <span>Historial de Responsivas</span>
+                  </NavLink>
+
+                  <NavLink
+                    to="/loans"
+                    className={({ isActive }) => `drawer-nav-item ${isActive ? 'active-copper' : ''}`}
+                    onClick={() => setMobileDrawerOpen(false)}
+                  >
+                    <ArrowRightLeft size={19} style={{ color: 'var(--coficab-copper)' }} />
+                    <span>Préstamos Temporales IT</span>
                   </NavLink>
                 </div>
               </div>

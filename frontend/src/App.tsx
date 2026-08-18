@@ -15,6 +15,7 @@ const TVDashboard = lazy(() => import('./pages/TVDashboard').then(m => ({ defaul
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const PrintResponsiva = lazy(() => import('./pages/PrintResponsiva').then(m => ({ default: m.PrintResponsiva })));
 const ResponsivasHistory = lazy(() => import('./pages/ResponsivasHistory').then(m => ({ default: m.ResponsivasHistory })));
+const Loans = lazy(() => import('./pages/Loans').then(m => ({ default: m.Loans })));
 
 const PageLoader: React.FC = () => (
   <div style={{
@@ -131,6 +132,15 @@ const AppRoutes: React.FC = () => {
             element={
               <ProtectedRoute>
                 <ResponsivasHistory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/loans"
+            element={
+              <ProtectedRoute>
+                <Loans />
               </ProtectedRoute>
             }
           />

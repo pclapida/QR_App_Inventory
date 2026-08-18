@@ -9,6 +9,7 @@ import { ExcelImportModal } from '../components/inventory/ExcelImportModal';
 import { DecommissionModal } from '../components/inventory/DecommissionModal';
 import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
 import { InventoryReportModal } from '../components/inventory/InventoryReportModal';
+import { ThermalLabelModal } from '../components/ThermalLabelModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -107,6 +108,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [viewingItem, setViewingItem] = useState<Item | null>(null);
   const [timelineItem, setTimelineItem] = useState<Item | null>(null);
   const [decommissionItem, setDecommissionItem] = useState<Item | null>(null);
+  const [thermalItems, setThermalItems] = useState<Item[] | null>(null);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -956,6 +958,12 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         />
       )}
 
+      {/* Thermal Labels Print Modal (Zebra / Dymo) */}
+      <ThermalLabelModal
+        isOpen={!!thermalItems}
+        onClose={() => setThermalItems(null)}
+        items={thermalItems || []}
+      />
 
       {selectedItemIds.size > 0 && (
         <div style={{
@@ -971,14 +979,27 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           alignItems: 'center',
           gap: '1.5rem',
           zIndex: 100,
-          border: '1px solid var(--border-color)'
+          border: '1px solid var(--border-color)',
+          flexWrap: 'wrap'
         }}>
           <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>
             {selectedItemIds.size} equipos seleccionados
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button 
               className="btn btn-primary"
+              onClick={() => {
+                const itemsToPrint = items.filter(i => selectedItemIds.has(i.id));
+                setThermalItems(itemsToPrint);
+              }}
+              style={{ background: 'linear-gradient(135deg, #c98a4b 0%, #b07238 100%)', fontWeight: 800, gap: '0.4rem' }}
+            >
+              <Tag size={17} />
+              Etiquetas Térmicas ({selectedItemIds.size})
+            </button>
+
+            <button 
+              className="btn btn-secondary"
               onClick={() => {
                 const itemsToPrint = items.filter(i => selectedItemIds.has(i.id));
                 printQRLabels(itemsToPrint);
@@ -986,8 +1007,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               }}
             >
               <Printer size={18} />
-              Imprimir Lote QR
+              Imprimir Lote Carta
             </button>
+
             <button 
               className="btn btn-secondary"
               onClick={() => setSelectedItemIds(new Set())}

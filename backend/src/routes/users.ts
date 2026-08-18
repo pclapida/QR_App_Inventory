@@ -157,4 +157,114 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ─── GET /api/users/backup/download — Descarga de respaldo completo 1-Clic ──
+router.get('/backup/download', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const [
+      users,
+      items,
+      transactions,
+      maintenances,
+      purchaseOrders,
+      responsivas,
+      loans
+    ] = await Promise.all([
+      prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      }),
+      prisma.item.findMany(),
+      prisma.transaction.findMany(),
+      prisma.maintenance.findMany(),
+      prisma.purchaseOrder.findMany(),
+      prisma.responsivaHistory.findMany(),
+      prisma.deviceLoan.findMany()
+    ]);
+
+    const backupData = {
+      metadata: {
+        title: 'COFICAB Inventory System - Base de Datos Backup',
+        exportedAt: new Date().toISOString(),
+        exportedBy: req.user?.name || req.user?.username || 'Admin',
+        engine: 'PostgreSQL',
+        version: '2.0.0',
+        totalTables: 7,
+        recordCounts: {
+          users: users.length,
+          items: items.length,
+          transactions: transactions.length,
+          maintenances: maintenances.length,
+          purchaseOrders: purchaseOrders.length,
+          responsivas: responsivas.length,
+          deviceLoans: loans.length,
+          totalRecords: users.length + items.length + transactions.length + maintenances.length + purchaseOrders.length + responsivas.length + loans.length
+        }
+      },
+      data: {
+        users,
+        items,
+        transactions,
+        maintenances,
+        purchaseOrders,
+        responsivas,
+        deviceLoans: loans
+      }
+    };
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="COFICAB_QR_Inventory_Backup_${dateStr}.json"`);
+    return res.send(JSON.stringify(backupData, null, 2));
+  } catch (error: any) {
+    console.error('Error generating database backup:', error);
+    return res.status(500).json({ error: 'Error al generar el respaldo de la base de datos' });
+  }
+});
+
+// ─── GET /api/users/stats/summary — Estadísticas globales del sistema ───────
+router.get('/stats/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const [
+      usersCount,
+      itemsCount,
+      transactionsCount,
+      maintenancesCount,
+      purchaseOrdersCount,
+      responsivasCount,
+      loansCount
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.item.count(),
+      prisma.transaction.count(),
+      prisma.maintenance.count(),
+      prisma.purchaseOrder.count(),
+      prisma.responsivaHistory.count(),
+      prisma.deviceLoan.count()
+    ]);
+
+    return res.json({
+      stats: {
+        users: usersCount,
+        items: itemsCount,
+        transactions: transactionsCount,
+        maintenances: maintenancesCount,
+        purchaseOrders: purchaseOrdersCount,
+        responsivas: responsivasCount,
+        deviceLoans: loansCount,
+        totalRecords: usersCount + itemsCount + transactionsCount + maintenancesCount + purchaseOrdersCount + responsivasCount + loansCount
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching database stats:', error);
+    return res.status(500).json({ error: 'Error al obtener estadísticas del sistema' });
+  }
+});
+
 export default router;

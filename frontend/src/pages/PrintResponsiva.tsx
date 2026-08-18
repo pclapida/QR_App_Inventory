@@ -213,13 +213,27 @@ export const PrintResponsiva: React.FC = () => {
             Fecha de entrega: <u>&nbsp;&nbsp;{today.getDate().toString().padStart(2, '0')}&nbsp;&nbsp;</u> / <u>&nbsp;&nbsp;{(today.getMonth() + 1).toString().padStart(2, '0')}&nbsp;&nbsp;</u> / <u>&nbsp;&nbsp;{today.getFullYear()}&nbsp;&nbsp;</u>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '60px' }}>
-            <div className="signature-box">
-              <br/>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '40px' }}>
+            <div className="signature-box" style={{ position: 'relative', minHeight: '80px' }}>
+              {data.signatureData ? (
+                <div style={{ marginBottom: '5px' }}>
+                  <img
+                    src={data.signatureData}
+                    alt="Firma Digital"
+                    style={{ maxHeight: '60px', maxWidth: '200px', display: 'block', margin: '0 auto' }}
+                  />
+                  <small style={{ fontSize: '7pt', color: '#666', display: 'block' }}>
+                    🔒 Firmado digitalmente en dispositivo COFICAB
+                  </small>
+                </div>
+              ) : (
+                <br/>
+              )}
               <strong>Firma del colaborador</strong><br/>
               {data.colaborador}
             </div>
-            <div className="signature-box">
+            <div className="signature-box" style={{ minHeight: '80px' }}>
+              <br/>
               <br/>
               <strong>Nombre y firma del responsable de TI</strong>
             </div>

@@ -61,6 +61,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
       accesoriosJson,
       observaciones,
       photoUrlsJson,
+      signatureData,
       email
     } = req.body;
 
@@ -76,6 +77,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
           accesoriosJson: accesoriosJson || '{}',
           observaciones: observaciones || '',
           photoUrlsJson: photoUrlsJson || '[]',
+          signatureData: signatureData || null,
           email: email || null,
           emailSent: false
         }

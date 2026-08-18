@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Shield,
@@ -15,7 +15,12 @@ import {
   Laptop,
   Layers,
   Wrench,
-  Search
+  Search,
+  Download,
+  Database,
+  Server,
+  RefreshCw,
+  HardDrive
 } from 'lucide-react';
 
 interface SystemUser {
@@ -62,6 +67,20 @@ export const AdminDashboard: React.FC = () => {
   });
   const [editLoading, setEditLoading] = useState<boolean>(false);
 
+  // DB Backup and Stats State
+  const [dbStats, setDbStats] = useState<{
+    users: number;
+    items: number;
+    transactions: number;
+    maintenances: number;
+    purchaseOrders: number;
+    responsivas: number;
+    deviceLoans: number;
+    totalRecords: number;
+  } | null>(null);
+  const [backupLoading, setBackupLoading] = useState<boolean>(false);
+  const [statsLoading, setStatsLoading] = useState<boolean>(false);
+
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -76,8 +95,44 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const fetchDbStats = async () => {
+    try {
+      setStatsLoading(true);
+      const stats = await adminApi.getStats();
+      setDbStats(stats);
+    } catch (err) {
+      console.error('Error al obtener estadísticas de DB:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const blob = await adminApi.downloadBackup();
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      link.setAttribute('download', `COFICAB_QR_Inventory_Backup_${today}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setSuccessMessage('Respaldo de base de datos generado y descargado exitosamente.');
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err: any) {
+      console.error('Error al descargar el respaldo:', err);
+      setError('Error al generar la descarga del respaldo.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchDbStats();
   }, []);
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -202,7 +257,7 @@ export const AdminDashboard: React.FC = () => {
             </h2>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            Gestión centralizada de cuentas de usuario, roles de seguridad (ADMIN vs CONSULTA), permisos del sistema y auditoría de transacciones.
+            Gestión centralizada de cuentas de usuario, roles de seguridad, permisos del sistema y auditoría de transacciones.
           </p>
         </div>
 
@@ -285,6 +340,86 @@ export const AdminDashboard: React.FC = () => {
           </div>
           <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#60a5fa', marginTop: '0.3rem' }}>
             {totalStandardUsers}
+          </div>
+        </div>
+      </div>
+
+      {/* Database Backup & Health Section */}
+      <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(192, 132, 252, 0.3)', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(88, 28, 135, 0.15) 100%)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ padding: '0.45rem', borderRadius: 'var(--radius-md)', background: 'rgba(192, 132, 252, 0.2)', color: '#c084fc', display: 'flex' }}>
+                <Database size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
+                  Seguridad & Respaldo Integral de Base de Datos
+                </h3>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                  Motor: <strong style={{ color: '#60a5fa' }}>PostgreSQL (qr_inventory)</strong> • Respaldo estructurado JSON de 7 tablas
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchDbStats}
+              disabled={statsLoading}
+              title="Actualizar conteo de registros"
+              style={{ padding: '0.55rem 0.85rem' }}
+            >
+              <RefreshCw size={16} className={statsLoading ? 'spinning' : ''} style={statsLoading ? { animation: 'spin 1s linear infinite' } : undefined} />
+            </button>
+
+            <button
+              className="btn btn-primary"
+              onClick={handleDownloadBackup}
+              disabled={backupLoading}
+              style={{
+                background: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)',
+                color: '#fff',
+                fontWeight: 800,
+                padding: '0.65rem 1.35rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                boxShadow: '0 4px 15px rgba(168, 85, 247, 0.35)'
+              }}
+            >
+              <Download size={18} />
+              {backupLoading ? 'Generando Respaldo...' : 'Descargar Respaldo 1-Clic (.json)'}
+            </button>
+          </div>
+        </div>
+
+        {/* Database table record metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Equipos / Activos</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>{dbStats?.items ?? '...'}</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Préstamos IT</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--coficab-copper)' }}>{dbStats?.deviceLoans ?? '...'}</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Movimientos Stock</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#60a5fa' }}>{dbStats?.transactions ?? '...'}</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Responsivas Firmadas</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#34d399' }}>{dbStats?.responsivas ?? '...'}</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mantenimientos</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fbbf24' }}>{dbStats?.maintenances ?? '...'}</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Total Registros</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#c084fc' }}>{dbStats?.totalRecords ?? '...'}</div>
           </div>
         </div>
       </div>

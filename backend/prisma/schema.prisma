@@ -56,6 +56,7 @@ model Item {
   transactions          Transaction[]
   maintenances          Maintenance[]
   responsivas           ResponsivaHistory[]
+  loans                 DeviceLoan[]
 
   @@index([plant, category])
   @@index([isITInternal])
@@ -133,6 +134,7 @@ model ResponsivaHistory {
   accesoriosJson String
   observaciones  String?
   photoUrlsJson  String?
+  signatureData  String?
   email          String?
   emailSent      Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -140,3 +142,27 @@ model ResponsivaHistory {
   @@index([itemId])
   @@index([createdAt])
 }
+
+model DeviceLoan {
+  id             String    @id @default(uuid())
+  itemId         String
+  item           Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  borrowerName   String
+  borrowerArea   String?
+  borrowerBadge  String?
+  loanDate       DateTime  @default(now())
+  expectedReturn DateTime
+  actualReturn   DateTime?
+  status         String    @default("ACTIVE")
+  loanNotes      String?
+  returnNotes    String?
+  loanedBy       String
+  receivedBy     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([itemId])
+  @@index([status])
+  @@index([expectedReturn])
+}
+
