@@ -5,7 +5,7 @@ import { CoficabLogo } from '../components/CoficabLogo';
 import { Lock, User, AlertCircle, ArrowRight, ShieldCheck, Sun, Moon } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const [identifier, setIdentifier] = useState<string>('admin@inventory.com');
+  const [identifier, setIdentifier] = useState<string>('pclapida');
   const [password, setPassword] = useState<string>('admin123');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -175,9 +175,9 @@ export const Login: React.FC = () => {
           textAlign: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--coficab-copper)', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <ShieldCheck size={16} /> Credenciales Demo COFICAB:
+            <ShieldCheck size={16} /> Credenciales de Acceso COFICAB:
           </div>
-          <div>Usuario: <strong style={{ color: 'var(--text-main)' }}>admin@inventory.com</strong></div>
+          <div>Usuario: <strong style={{ color: 'var(--text-main)' }}>pclapida</strong></div>
           <div>Contraseña: <strong style={{ color: 'var(--text-main)' }}>admin123</strong></div>
         </div>
       </div>

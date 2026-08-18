@@ -10,18 +10,23 @@ async function main() {
   const hashedPassword = await bcrypt.hash('admin123', 10);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@inventory.com' },
-    update: {},
+    where: { email: 'pclapida@inventory.com' },
+    update: {
+      username: 'pclapida',
+      name: 'pclapida',
+      password: hashedPassword,
+      role: 'ADMIN'
+    },
     create: {
-      email: 'admin@inventory.com',
-      username: 'admin',
-      name: 'Administrador de Sistema',
+      email: 'pclapida@inventory.com',
+      username: 'pclapida',
+      name: 'pclapida',
       password: hashedPassword,
       role: 'ADMIN'
     }
   });
 
-  console.log('Usuario administrador creado/verificado:', admin.email);
+  console.log('Usuario administrador creado/verificado:', admin.username);
 
   // Seed sample items if database is empty
   const itemCount = await prisma.item.count();

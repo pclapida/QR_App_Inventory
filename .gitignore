@@ -16,6 +16,8 @@ yarn-error.log*
 dist/
 build/
 *.js.map
+cloudflared.exe
+*.exe
 
 # ── SQLite (base de datos local) ─────────────────────────────────────────────
 *.db
