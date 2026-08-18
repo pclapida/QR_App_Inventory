@@ -19,38 +19,9 @@ const PORT = process.env.PORT || 4000;
 // Security headers
 app.use(helmet({ contentSecurityPolicy: false }));
 
-// CORS — allow localhost, local network IPs (10.x, 192.168.x, 172.16-31.x), and FRONTEND_URL
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:80',
-  'http://localhost',
-  'http://127.0.0.1:3000',
-  process.env.FRONTEND_URL
-].filter(Boolean) as string[];
-
-// Regex to match private/LAN IP ranges (RFC 1918)
-const isLocalNetworkOrigin = (origin: string): boolean => {
-  try {
-    const { hostname } = new URL(origin);
-    return (
-      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||          // 10.0.0.0/8
-      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||              // 192.168.0.0/16
-      /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname) // 172.16.0.0/12
-    );
-  } catch {
-    return false;
-  }
-};
-
+// CORS — allow localhost, local network IPs, tunnels (Cloudflare, Localtunnel), and any client
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow: no origin (Postman, same-origin), explicit list, or local LAN IPs
-    if (!origin || allowedOrigins.includes(origin) || isLocalNetworkOrigin(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS: Origen no permitido: ${origin}`));
-    }
-  },
+  origin: true,
   credentials: true
 }));
 
