@@ -3,31 +3,63 @@ import { createRoot } from 'react-dom/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { Item } from '../services/api';
 
-const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
+export type LabelSizeOption = 'brother-24' | '50x25' | '50x30' | '75x50';
+
+interface LabelRendererProps {
+  items: Item[];
+  size?: LabelSizeOption;
+}
+
+const LabelRenderer: React.FC<LabelRendererProps> = ({ items, size = 'brother-24' }) => {
+  // Determine page dimensions based on selected format
+  let pageWidth = '70mm';
+  let pageHeight = '24mm';
+  let qrSize = 75; // px
+
+  if (size === 'brother-24') {
+    pageWidth = '70mm';
+    pageHeight = '24mm';
+    qrSize = 75;
+  } else if (size === '50x25') {
+    pageWidth = '50mm';
+    pageHeight = '25mm';
+    qrSize = 70;
+  } else if (size === '50x30') {
+    pageWidth = '50mm';
+    pageHeight = '30mm';
+    qrSize = 85;
+  } else if (size === '75x50') {
+    pageWidth = '75mm';
+    pageHeight = '50mm';
+    qrSize = 140;
+  }
+
   return (
     <>
       <style>{`
         @page {
-          size: 50mm 30mm;
+          size: ${pageWidth} ${pageHeight};
           margin: 0;
         }
         body {
           margin: 0;
           padding: 0;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
           background: #fff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         * {
           box-sizing: border-box;
         }
         .label-page {
-          width: 50mm;
-          height: 30mm;
+          width: ${pageWidth};
+          height: ${pageHeight};
           page-break-after: always;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 2mm;
+          padding: 1.2mm 2mm;
           overflow: hidden;
         }
         .label-page:last-child {
@@ -36,7 +68,7 @@ const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
         .label-content {
           display: flex;
           align-items: center;
-          gap: 2mm;
+          gap: 2.2mm;
           width: 100%;
           height: 100%;
         }
@@ -44,8 +76,7 @@ const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 22mm;
-          height: 22mm;
+          height: 100%;
           flex-shrink: 0;
         }
         .info-section {
@@ -54,25 +85,41 @@ const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
           flex-direction: column;
           justify-content: center;
           overflow: hidden;
+          line-height: 1.15;
         }
-        .info-title {
-          font-size: 5pt;
-          color: #555;
+        .corp-tag {
+          font-size: 5.5pt;
+          font-weight: 900;
+          letter-spacing: 0.5px;
+          color: #002b90;
           margin: 0;
-          line-height: 1.1;
+          text-transform: uppercase;
         }
-        .info-value {
-          font-size: 6pt;
-          font-weight: bold;
+        .sku-tag {
+          font-size: 8pt;
+          font-weight: 900;
           color: #000;
-          margin: 0 0 1.5mm 0;
-          line-height: 1.1;
+          margin: 0.5mm 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .info-value:last-child {
-          margin-bottom: 0;
+        .item-name {
+          font-size: 6pt;
+          font-weight: 700;
+          color: #111;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0;
+        }
+        .item-sub {
+          font-size: 5pt;
+          color: #333;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0.3mm 0 0 0;
         }
       `}</style>
 
@@ -81,24 +128,21 @@ const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
           <div className="label-content">
             <div className="qr-section">
               <QRCodeSVG
-                value={item.qrCodePayload}
-                size={80} /* Approximate size in pixels to fit 22mm */
+                value={item.qrCodePayload || `INV-${item.id}`}
+                size={qrSize}
                 level="M"
                 includeMargin={false}
               />
             </div>
             <div className="info-section">
-              <div className="info-title">Equipo:</div>
-              <div className="info-value">{item.name}</div>
-              
-              <div className="info-title">Modelo:</div>
-              <div className="info-value">{item.model || 'N/A'}</div>
-
-              <div className="info-title">S/N:</div>
-              <div className="info-value">{item.serialNumber || 'N/A'}</div>
-
-              <div className="info-title">SKU:</div>
-              <div className="info-value">{item.sku}</div>
+              <div className="corp-tag">COFICAB IT</div>
+              <div className="sku-tag">{item.sku}</div>
+              <div className="item-name">{item.name}</div>
+              {item.model && <div className="item-sub">Mod: {item.model}</div>}
+              {item.serialNumber && <div className="item-sub">S/N: {item.serialNumber}</div>}
+              <div className="item-sub" style={{ fontWeight: 600, color: '#555' }}>
+                {item.plant || 'Planta 2'} {item.area ? `• ${item.area}` : ''}
+              </div>
             </div>
           </div>
         </div>
@@ -107,7 +151,7 @@ const LabelRenderer: React.FC<{ items: Item[] }> = ({ items }) => {
   );
 };
 
-export const printQRLabels = (items: Item[]) => {
+export const printQRLabels = (items: Item[], size: LabelSizeOption = 'brother-24') => {
   if (items.length === 0) return;
 
   const win = window.open('', '_blank');
@@ -123,7 +167,7 @@ export const printQRLabels = (items: Item[]) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Impresión de Etiquetas QR</title>
+      <title>Etiquetas QR Brother / Zebra</title>
     </head>
     <body>
       <div id="print-root"></div>
@@ -136,13 +180,10 @@ export const printQRLabels = (items: Item[]) => {
   const container = win.document.getElementById('print-root');
   if (container) {
     const root = createRoot(container);
-    
-    // We pass a callback to print after rendering, but React 18 createRoot doesn't support a render callback directly.
-    // So we use setTimeout.
-    root.render(<LabelRenderer items={items} />);
+    root.render(<LabelRenderer items={items} size={size} />);
 
     setTimeout(() => {
       win.print();
-    }, 800); // Give it enough time to render SVG and apply CSS
+    }, 600);
   }
 };
