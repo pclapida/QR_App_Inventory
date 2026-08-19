@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Camera, FileText, CheckCircle2, Printer, ChevronLeft, Eye } from 'lucide-react';
-import { Item, responsivasApi } from '../services/api';
+import { Item, responsivasApi, itemsApi } from '../services/api';
 import { SignatureCanvas } from './SignatureCanvas';
 
 interface ResponsivaModalProps {
@@ -12,6 +12,9 @@ interface ResponsivaModalProps {
 
 export interface ResponsivaData {
   colaborador: string;
+  area?: string;
+  badge?: string;
+  email?: string;
   marcaModelo: string;
   serie: string;
   nombreEquipo: string;
@@ -264,26 +267,55 @@ const DocumentPreview: React.FC<{
 }> = ({ item, data, onBack, onSuccess }) => {
   const [printing, setPrinting] = useState(false);
 
-  const handlePrint = async () => {
+  const handleAssignAndPrint = async () => {
     setPrinting(true);
     try {
-      // Guardar en el historial incluyendo la firma digital capturada
-      await responsivasApi.create({
-        itemId: item.id,
+      // 1. Asignar formalmente el equipo en la BD (actualiza assignedTo, isITInternal: false, y crea Responsiva + Transacción)
+      await itemsApi.assign(item.id, {
         colaborador: data.colaborador,
+        area: data.area,
+        badge: data.badge,
+        email: data.email,
         marcaModelo: data.marcaModelo,
         serie: data.serie,
         nombreEquipo: data.nombreEquipo,
-        accesoriosJson: JSON.stringify(data.accesorios),
+        accesoriosJson: data.accesorios,
         observaciones: data.estado,
-        photoUrlsJson: JSON.stringify(data.photoUrls),
+        photoUrlsJson: data.photoUrls,
         signatureData: data.signatureData
-      }).catch(err => {
-        console.error("No se pudo guardar el historial de la responsiva", err);
       });
 
       onSuccess?.();
       await openPrintWindow(item, data);
+    } catch (err: any) {
+      console.error("Error al asignar equipo:", err);
+      alert(err.response?.data?.error || "Error al procesar la asignación del equipo.");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleAssignOnly = async () => {
+    setPrinting(true);
+    try {
+      await itemsApi.assign(item.id, {
+        colaborador: data.colaborador,
+        area: data.area,
+        badge: data.badge,
+        email: data.email,
+        marcaModelo: data.marcaModelo,
+        serie: data.serie,
+        nombreEquipo: data.nombreEquipo,
+        accesoriosJson: data.accesorios,
+        observaciones: data.estado,
+        photoUrlsJson: data.photoUrls,
+        signatureData: data.signatureData
+      });
+
+      onSuccess?.();
+    } catch (err: any) {
+      console.error("Error al asignar equipo:", err);
+      alert(err.response?.data?.error || "Error al procesar la asignación del equipo.");
     } finally {
       setPrinting(false);
     }
@@ -320,15 +352,25 @@ const DocumentPreview: React.FC<{
         <span style={{ color: '#9ca3af', fontSize: '0.85rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Vista previa — <strong style={{ color: '#fff' }}>{data.colaborador}</strong>
         </span>
-        <button
-          onClick={handlePrint}
-          className="btn btn-primary"
-          disabled={printing}
-          style={{ padding: '0.5rem 1.1rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-        >
-          <Printer size={16} />
-          {printing ? 'Preparando...' : 'Imprimir / Guardar PDF'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={handleAssignOnly}
+            className="btn btn-secondary"
+            disabled={printing}
+            style={{ padding: '0.5rem 0.85rem', fontSize: '0.86rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+          >
+            <CheckCircle2 size={15} /> Solo Guardar Asignación
+          </button>
+          <button
+            onClick={handleAssignAndPrint}
+            className="btn btn-primary"
+            disabled={printing}
+            style={{ padding: '0.5rem 1.1rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Printer size={16} />
+            {printing ? 'Asignando e imprimiendo...' : 'Confirmar Asignación & Imprimir (PDF)'}
+          </button>
+        </div>
       </div>
 
       {/* Scrollable preview */}
@@ -426,6 +468,9 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
   const [generatedData, setGeneratedData] = useState<ResponsivaData | null>(null);
 
   const [colaborador, setColaborador] = useState('');
+  const [area, setArea] = useState('');
+  const [badge, setBadge] = useState('');
+  const [email, setEmail] = useState('');
   const [marcaModelo, setMarcaModelo] = useState('');
   const [serie, setSerie] = useState('');
   const [nombreEquipo, setNombreEquipo] = useState('');
@@ -437,6 +482,9 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen && item) {
       setColaborador(item.assignedTo || '');
+      setArea(item.assignedArea || item.area || '');
+      setBadge(item.assignedBadge || '');
+      setEmail('');
       setMarcaModelo(item.model ? `${item.name} (${item.model})` : item.name || '');
       setSerie(item.serialNumber || '');
       setNombreEquipo(item.sku || '');
@@ -463,6 +511,9 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
     // Capture all state values at the time of submit
     const snapshot: ResponsivaData = {
       colaborador: colaborador.trim(),
+      area: area.trim() || undefined,
+      badge: badge.trim() || undefined,
+      email: email.trim() || undefined,
       marcaModelo: marcaModelo.trim(),
       serie: serie.trim(),
       nombreEquipo: nombreEquipo.trim(),
@@ -496,7 +547,7 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
           {/* Equipment data */}
           <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-md)', padding: '0.9rem', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
-              Datos del Equipo (editables)
+              Datos del Equipo & Colaborador
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -505,6 +556,21 @@ export const ResponsivaModal: React.FC<ResponsivaModalProps> = ({ isOpen, onClos
                 <input type="text" className="form-input" value={colaborador}
                   onChange={e => setColaborador(e.target.value)}
                   placeholder="Ej. Juan Pérez" required />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Área / Departamento</label>
+                  <input type="text" className="form-input" value={area}
+                    onChange={e => setArea(e.target.value)}
+                    placeholder="ej. Mantenimiento" />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>Nómina / Badge</label>
+                  <input type="text" className="form-input" value={badge}
+                    onChange={e => setBadge(e.target.value)}
+                    placeholder="ej. 10452" />
+                </div>
               </div>
 
               <div>
