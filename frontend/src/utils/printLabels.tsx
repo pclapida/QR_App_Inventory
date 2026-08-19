@@ -135,7 +135,7 @@ const LabelRenderer: React.FC<LabelRendererProps> = ({ items, size = 'brother-24
               />
             </div>
             <div className="info-section">
-              <div className="corp-tag">COFICAB IT</div>
+              <div className="corp-tag">{item.plant === 'Planta UPCAST' ? 'COFUD' : 'COFDG'}</div>
               <div className="sku-tag">{item.sku}</div>
               <div className="item-name">{item.name}</div>
               {item.model && <div className="item-sub">Mod: {item.model}</div>}

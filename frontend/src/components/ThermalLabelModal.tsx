@@ -165,7 +165,9 @@ export const ThermalLabelModal: React.FC<ThermalLabelModalProps> = ({
                   <QRCodeSVG value={item.qrCodePayload || `INV-${item.id}`} size={65} level="M" />
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.2 }}>
-                  <div style={{ fontSize: '6.5pt', fontWeight: 900, color: '#002b90', letterSpacing: '0.5px' }}>COFICAB IT</div>
+                  <div style={{ fontSize: '6.5pt', fontWeight: 900, color: '#002b90', letterSpacing: '0.5px' }}>
+                    {item.plant === 'Planta UPCAST' ? 'COFUD' : 'COFDG'}
+                  </div>
                   <div style={{ fontSize: '8.5pt', fontWeight: 900, color: '#000000', margin: '1px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.sku}
                   </div>
