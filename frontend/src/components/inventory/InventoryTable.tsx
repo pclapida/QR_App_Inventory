@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Search, QrCode, Trash2, Edit, MapPin, Undo2, CheckSquare, FileText, RotateCcw, AlertTriangle, Truck, Package
+  Search, QrCode, Trash2, Edit, MapPin, Undo2, CheckSquare, FileText, RotateCcw, AlertTriangle, Truck, Package, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { Item } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -42,6 +42,21 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
 }) => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'SUPERADMIN';
+  
+  // State for accordion: keep track of collapsed categories
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+
+  const toggleCategory = (category: string) => {
+    setCollapsedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
 
   const toggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     const updated = new Set(selectedItemIds);
@@ -85,25 +100,33 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
             }, {} as Record<string, Item[]>)
           )
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([category, catItems]) => (
-              <React.Fragment key={category}>
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'rgba(255,255,255,0.04)',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      color: 'var(--text-muted)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}
+            .map(([category, catItems]) => {
+              const isCollapsed = collapsedCategories.has(category);
+              return (
+                <React.Fragment key={category}>
+                  <tr
+                    onClick={() => toggleCategory(category)}
+                    style={{ cursor: 'pointer' }}
                   >
-                    {category}
-                  </td>
-                </tr>
-                {catItems.map((item) => {
+                    <td
+                      colSpan={6}
+                      style={{
+                        padding: '0.65rem 1rem',
+                        background: 'rgba(255,255,255,0.04)',
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                        {category} <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>({catItems.length})</span>
+                      </div>
+                    </td>
+                  </tr>
+                  {!isCollapsed && catItems.map((item) => {
                   const isOwnPlantItem = isSuperAdmin || !item.originPlant || item.originPlant === user?.plant;
                   return (
                     <tr
@@ -346,7 +369,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                   );
                 })}
               </React.Fragment>
-            ))}
+              );
+            })}
         </tbody>
       </table>
       {items.length === 0 && (
