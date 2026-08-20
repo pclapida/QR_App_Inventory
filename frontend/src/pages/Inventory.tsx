@@ -10,6 +10,7 @@ import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
 import { InventoryReportModal } from '../components/inventory/InventoryReportModal';
 import { ThermalLabelModal } from '../components/ThermalLabelModal';
 import { ResponsivaModal } from '../components/ResponsivaModal';
+import { ChecklistModal } from '../components/ChecklistModal';
 import { printQRLabels } from '../utils/printLabels';
 import {
   Package,
@@ -57,8 +58,11 @@ interface InventoryProps {
 export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { user, canEdit, canDelete } = useAuth();
+  
+  // Backward compatible role check for actions
+  const isAdmin = canEdit || user?.role === 'ADMIN';
+  const isSuper = canDelete || user?.role === 'ADMIN';
 
   // 6 Tabs: ASSIGNED, AVAILABLE, LOANS, SCRAP, TRANSFERS, DAMAGED
   const [activeTab, setActiveTab] = useState<InventoryTabType>(() => {
@@ -87,6 +91,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [viewingItem, setViewingItem] = useState<Item | null>(null);
   const [timelineItem, setTimelineItem] = useState<Item | null>(null);
   const [decommissionItem, setDecommissionItem] = useState<Item | null>(null);
+  const [checklistPendingItem, setChecklistPendingItem] = useState<Item | null>(null);
   const [assigningItem, setAssigningItem] = useState<Item | null>(null);
   const [transferringItem, setTransferringItem] = useState<Item | null>(null);
   const [permanentDeleteItem, setPermanentDeleteItem] = useState<Item | null>(null);
@@ -635,8 +640,8 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             </button>
           )}
 
-          {isAdmin && activeTab === 'ASSIGNED' && (
-            <div title="Para asignar un equipo, regístralo primero en Disponible y usa la opción 'Asignar a Colaborador'">
+          {isAdmin && activeTab === 'AVAILABLE' && (
+            <div title="Para asignar un equipo, búscalo en esta tabla y usa la opción 'Asignar' en la columna de Acciones">
               <button
                 className="btn btn-secondary"
                 onClick={() => {
@@ -1134,9 +1139,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                     <button
                                       type="button"
                                       className="btn btn-primary"
-                                      onClick={() => setAssigningItem(item)}
-                                      title="Asignar equipo a colaborador con Responsiva Digital"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700 }}
+                                      onClick={() => setChecklistPendingItem(item)}
+                                      title="Asignar Equipo (Genera Responsiva y Checklist)"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'var(--coficab-copper)', borderColor: 'var(--coficab-copper)' }}
                                     >
                                       <FileText size={14} /> Asignar
                                     </button>
@@ -1252,7 +1257,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                                   )}
 
                                   {/* Action: Permanent Delete ONLY in SCRAP tab */}
-                                  {isAdmin && activeTab === 'SCRAP' && (
+                                  {isSuper && activeTab === 'SCRAP' && (
                                     <button
                                       type="button"
                                       className="btn btn-secondary"
@@ -1281,6 +1286,23 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       {/* ========================================================================= */}
       {/* MODALS SECTION                                                            */}
       {/* ========================================================================= */}
+
+      {/* 0. Checklist Modal (Pre-Assignment Flow) */}
+      {checklistPendingItem && (
+        <ChecklistModal
+          isOpen={Boolean(checklistPendingItem)}
+          onClose={() => setChecklistPendingItem(null)}
+          itemId={checklistPendingItem.id}
+          itemName={checklistPendingItem.name}
+          itemSku={checklistPendingItem.sku}
+          onCompleted={() => {
+            const item = checklistPendingItem;
+            setChecklistPendingItem(null);
+            // Proceed to responsiva assignment
+            setAssigningItem(item);
+          }}
+        />
+      )}
 
       {/* 1. Responsiva Modal (Assignment Flow) */}
       {assigningItem && (

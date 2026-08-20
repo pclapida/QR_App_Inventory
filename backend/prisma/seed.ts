@@ -15,14 +15,16 @@ async function main() {
       username: 'pclapida',
       name: 'pclapida',
       password: hashedPassword,
-      role: 'ADMIN'
+      role: 'SUPERADMIN',
+      plant: null
     },
     create: {
       email: 'pclapida@inventory.com',
       username: 'pclapida',
       name: 'pclapida',
       password: hashedPassword,
-      role: 'ADMIN'
+      role: 'SUPERADMIN',
+      plant: null
     }
   });
 

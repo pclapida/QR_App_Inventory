@@ -69,6 +69,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
         username: user.username,
         name: user.name,
         role: user.role,
+        plant: user.plant ?? null,
         sessionId
       },
       secret,
@@ -82,7 +83,8 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
         email: user.email,
         username: user.username,
         name: user.name,
-        role: user.role
+        role: user.role,
+        plant: user.plant ?? null
       }
     });
   } catch (error: any) {
@@ -99,7 +101,7 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
     }
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, email: true, username: true, name: true, role: true, createdAt: true }
+      select: { id: true, email: true, username: true, name: true, role: true, plant: true, createdAt: true }
     });
 
     if (!user) {

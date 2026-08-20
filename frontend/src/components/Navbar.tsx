@@ -26,15 +26,17 @@ import {
   Layers,
   Trash2,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  Globe,
+  Building2
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, canManageUsers, isSuperAdmin, currentPlant } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = canManageUsers || user?.role === 'ADMIN';
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('coficab_theme') as 'light' | 'dark') || 'light';
@@ -165,6 +167,16 @@ export const Navbar: React.FC = () => {
           </NavLink>
 
           <NavLink
+            to="/inventario-global"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
+            title="Consultar inventario de todas las plantas"
+          >
+            <Globe size={16} style={{ color: '#34d399' }} />
+            Plantas
+          </NavLink>
+
+          <NavLink
             to="/scanner"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             style={{ padding: '0.45rem 0.75rem', fontSize: '0.86rem' }}
@@ -217,25 +229,28 @@ export const Navbar: React.FC = () => {
             )}
           </button>
 
-          {/* User Avatar Circle */}
-          <div
-            title={`Usuario: ${user?.name || user?.username} (${isAdmin ? 'ADMIN DE IT' : 'CONSULTA'})`}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: isAdmin ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)' : 'linear-gradient(135deg, #002B90 0%, #1d4ed8 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              cursor: 'default',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
-              fontWeight: 800,
-              fontSize: '0.85rem'
-            }}
-          >
-            {(user?.name || user?.username || 'U').charAt(0).toUpperCase()}
+          {/* User Avatar Circle with plant badge */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+            <div
+              title={`${user?.name || user?.username} | ${user?.role} | ${currentPlant || 'Global'}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.45rem',
+                background: isSuperAdmin
+                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  : isAdmin
+                    ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)'
+                    : 'linear-gradient(135deg, #002B90 0%, #1d4ed8 100%)',
+                borderRadius: '20px', padding: '0.25rem 0.6rem 0.25rem 0.35rem',
+                cursor: 'default', boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+              }}
+            >
+              <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.78rem', color: '#fff' }}>
+                {(user?.name || user?.username || 'U').charAt(0).toUpperCase()}
+              </span>
+              <span style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 700, maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentPlant ? currentPlant.replace('Planta ', 'P') : (isSuperAdmin ? 'Global' : '')}
+              </span>
+            </div>
           </div>
 
           <button

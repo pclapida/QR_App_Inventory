@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api, { User } from '../services/api';
+import api, { User, UserRole } from '../services/api';
 
 interface AuthContextType {
   token: string | null;
@@ -8,9 +8,21 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  // Role helpers
+  isSuperAdmin: boolean;
+  isPlantAdmin: boolean;
+  isOperator: boolean;
+  isAuditor: boolean;
+  canEdit: boolean;     // SUPERADMIN | ADMIN_PLANTA | OPERATOR
+  canDelete: boolean;   // SUPERADMIN | ADMIN_PLANTA
+  canManageUsers: boolean; // SUPERADMIN | ADMIN_PLANTA
+  currentPlant: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const hasRole = (user: User | null, ...roles: UserRole[]): boolean =>
+  !!user && roles.includes(user.role);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('qr_inventory_token'));
@@ -59,15 +71,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  // Computed role helpers
+  const isSuperAdmin = hasRole(user, 'SUPERADMIN');
+  const isPlantAdmin = hasRole(user, 'ADMIN_PLANTA', 'ADMIN');
+  const isOperator = hasRole(user, 'OPERATOR');
+  const isAuditor = hasRole(user, 'AUDITOR');
+  const canEdit = hasRole(user, 'SUPERADMIN', 'ADMIN_PLANTA', 'OPERATOR', 'ADMIN');
+  const canDelete = hasRole(user, 'SUPERADMIN', 'ADMIN_PLANTA', 'ADMIN');
+  const canManageUsers = hasRole(user, 'SUPERADMIN', 'ADMIN_PLANTA', 'ADMIN');
+  const currentPlant = user?.plant ?? null;
+
+  // Backward compatibility: treat old 'ADMIN' role as ADMIN_PLANTA, 'USER' as OPERATOR
+  const normalizedUser = user ? {
+    ...user,
+    role: (user.role as string) === 'ADMIN' ? 'ADMIN_PLANTA' as UserRole : user.role
+  } : null;
+
   return (
     <AuthContext.Provider
       value={{
         token,
-        user,
+        user: normalizedUser,
         isAuthenticated: !!token && !!user,
         login,
         logout,
-        loading
+        loading,
+        isSuperAdmin,
+        isPlantAdmin,
+        isOperator,
+        isAuditor,
+        canEdit,
+        canDelete,
+        canManageUsers,
+        currentPlant,
       }}
     >
       {children}

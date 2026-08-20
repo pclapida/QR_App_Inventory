@@ -16,6 +16,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ 
 const PrintResponsiva = lazy(() => import('./pages/PrintResponsiva').then(m => ({ default: m.PrintResponsiva })));
 const ResponsivasHistory = lazy(() => import('./pages/ResponsivasHistory').then(m => ({ default: m.ResponsivasHistory })));
 const Loans = lazy(() => import('./pages/Loans').then(m => ({ default: m.Loans })));
+const CrossPlantSearch = lazy(() => import('./pages/CrossPlantSearch').then(m => ({ default: m.CrossPlantSearch })));
 
 const PageLoader: React.FC = () => (
   <div style={{
@@ -35,7 +36,7 @@ const PageLoader: React.FC = () => (
 );
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; requireAdmin?: boolean }> = ({ children, requireAdmin }) => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, canManageUsers } = useAuth();
 
   if (loading) {
     return <PageLoader />;
@@ -45,7 +46,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requireAdmin?: boole
     return <Navigate to="/login" replace />;
   }
 
-  if (requireAdmin && user?.role !== 'ADMIN') {
+  // Support both old 'ADMIN' and new 'ADMIN_PLANTA'/'SUPERADMIN' roles
+  if (requireAdmin && !canManageUsers && user?.role !== 'ADMIN') {
     return <Navigate to="/inventory" replace />;
   }
 
@@ -159,6 +161,15 @@ const AppRoutes: React.FC = () => {
             element={
               <ProtectedRoute requireAdmin={true}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/inventario-global"
+            element={
+              <ProtectedRoute>
+                <CrossPlantSearch />
               </ProtectedRoute>
             }
           />

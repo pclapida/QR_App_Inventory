@@ -13,11 +13,15 @@ model User {
   username         String        @unique
   password         String
   name             String
+  // Roles: SUPERADMIN | ADMIN_PLANTA | OPERATOR | AUDITOR | USER
   role             String        @default("USER")
+  // Plant assignment: "Planta 1" | "Planta 2" | "Planta 3" | "Planta UPCAST" | null (for SUPERADMIN)
+  plant            String?
   currentSessionId String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   transactions     Transaction[]
+  checklists       DeviceChecklist[] @relation("ChecklistCreator")
 }
 
 model Item {
@@ -62,6 +66,7 @@ model Item {
   maintenances          Maintenance[]
   responsivas           ResponsivaHistory[]
   loans                 DeviceLoan[]
+  checklists            DeviceChecklist[]
 
   @@index([plant, category])
   @@index([isITInternal])
@@ -171,3 +176,24 @@ model DeviceLoan {
   @@index([expectedReturn])
 }
 
+model DeviceChecklist {
+  id             String    @id @default(uuid())
+  itemId         String
+  item           Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // IN_PROGRESS | COMPLETED | VOIDED
+  status         String    @default("IN_PROGRESS")
+  // JSON with 30 checklist items: {sectionA: [{id, label, value}], sectionB: [{id, label, value}]}
+  checklistData  String    @default("{}")
+  // JSON array of signatories: [{userId, userName, plant, role, timestamp, sections[]}]
+  signaturesJson String    @default("[]")
+  // ID of the user who created the checklist
+  createdById    String
+  createdBy      User      @relation("ChecklistCreator", fields: [createdById], references: [id])
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([itemId])
+  @@index([status])
+  @@index([createdById])
+}

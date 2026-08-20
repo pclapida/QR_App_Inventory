@@ -196,7 +196,7 @@ export const ThermalLabelModal: React.FC<ThermalLabelModalProps> = ({
         {/* Actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            💡 En el diálogo de impresión: Seleccionar <strong>Cinta Brother 24mm (0.94")</strong> y márgenes <strong>"Ninguno"</strong>.
+            💡 En el diálogo de impresión: Seleccionar <strong>Cinta Brother 24mm</strong>, diseño <strong>VERTICAL</strong> y márgenes <strong>"Ninguno"</strong>.
           </span>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button className="btn btn-secondary" onClick={onClose}>

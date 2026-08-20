@@ -6,15 +6,14 @@ Sistema de inventario con código QR para gestión de equipos de TI y operativos
 
 ## Características principales
 
-- **Inventario Dual** — Equipos de planta y equipos internos de TI en una sola app
-- **Escaneo QR** — Consulta y movimientos de equipos escaneando desde celular o lector
-- **Autenticación JWT** — Roles de Administrador y Usuario
-- **Dashboard TV** — Vista de pantalla completa para inventario IT u Operativo
-- **Mantenimientos** — Registro y seguimiento de mantenimientos preventivos por tipo de equipo
-- **Responsiva Digital** — Genera cartas de asignación con fotos y políticas listas para firmar e imprimir (funciona en móvil)
-- **Órdenes de Compra** — Seguimiento de pedidos a proveedores
-- **Alertas de Stock** — Notificación por categoría cuando el stock baja del mínimo
-- **Importación Excel** — Carga masiva de inventario desde archivo .xlsx
+- **Inventario Dual Multi-Planta** — Equipos operativos y de TI con aislamiento por planta (Planta 1, Planta 2, Planta 3, UPCAST).
+- **Roles Granulares** — Control de acceso estricto (SUPERADMIN, ADMIN_PLANTA, OPERATOR, AUDITOR, USER) con permisos jerárquicos.
+- **Escaneo QR y Túnel** — Consulta y transacciones desde dispositivos móviles usando escáner o cámara integrada.
+- **Checklist Obligatorio** — Validación estricta del estado de hardware antes de generar responsivas o asignaciones.
+- **Buscador Global (Inter-Planta)** — Localiza números de serie a través de cualquier planta del grupo instantáneamente.
+- **Transacciones Seguras** — Historial completo (Línea de Tiempo). En préstamos entre plantas, la planta receptora no puede alterar datos duros (SKU, Modelo, Serie) protegiendo la orden de compra original.
+- **Responsiva Digital** — Generación automática de cartas responsivas listas para firmar o imprimir.
+- **Mantenimientos** — Registro de bitácoras de servicio preventivo y correctivo.
 
 ---
 
@@ -74,7 +73,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 async function main() {
   const hash = await bcrypt.hash('TuContrasenaSegura123!', 12);
-  await prisma.user.create({ data: { email: 'admin@coficab.com', username: 'admin', password: hash, name: 'Administrador IT', role: 'ADMIN' } });
+  await prisma.user.create({ data: { email: 'admin@coficab.com', username: 'admin', password: hash, name: 'Administrador Global', role: 'SUPERADMIN', plant: null } });
   console.log('Admin creado.');
   await prisma.\$disconnect();
 }

@@ -10,6 +10,7 @@ import maintenanceRoutes from './routes/maintenance';
 import purchaseOrderRoutes from './routes/purchaseOrders';
 import responsivaRoutes from './routes/responsiva';
 import loanRoutes from './routes/loans';
+import checklistRoutes from './routes/checklists';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/responsivas', responsivaRoutes);
 app.use('/api/loans', loanRoutes);
+app.use('/api/checklists', checklistRoutes);
 
 // Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

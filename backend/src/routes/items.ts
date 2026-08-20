@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import { prisma } from '../utils/prisma';
-import { authenticateToken, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
+import { authenticateToken, requireAdmin, AuthenticatedRequest, ROLES } from '../middleware/auth';
 
 const router = Router();
 
@@ -176,6 +176,55 @@ router.post('/import-excel', requireAdmin, upload.single('file'), async (req: Au
   } catch (error: any) {
     console.error('Error al procesar archivo Excel:', error);
     return res.status(500).json({ error: 'Error al procesar el archivo Excel. Verifique el formato.' });
+  }
+});
+
+// GET /api/items/global-search - Cross-plant search (read-only, accessible to all authenticated roles)
+// Used for the "Consulta de Inventario entre Plantas" dashboard
+router.get('/global-search', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+      return res.status(400).json({ error: 'Se requiere un término de búsqueda de al menos 2 caracteres' });
+    }
+
+    const query = q.trim();
+    const items = await prisma.item.findMany({
+      where: {
+        status: 'ACTIVE',
+        OR: [
+          { serialNumber: { contains: query, mode: 'insensitive' } },
+          { sku: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query, mode: 'insensitive' } },
+          { model: { contains: query, mode: 'insensitive' } },
+          { assignedTo: { contains: query, mode: 'insensitive' } },
+          { ipAddress: { contains: query, mode: 'insensitive' } },
+        ]
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        model: true,
+        serialNumber: true,
+        plant: true,
+        originPlant: true,
+        status: true,
+        assignedTo: true,
+        assignedArea: true,
+        category: true,
+        ipAddress: true,
+        isITInternal: true,
+      },
+      take: 50,
+      orderBy: { plant: 'asc' }
+    });
+
+    return res.json({ items, total: items.length, query });
+  } catch (err: any) {
+    console.error('Error en global-search:', err);
+    return res.status(500).json({ error: 'Error al realizar la búsqueda global de inventario' });
   }
 });
 
@@ -833,29 +882,36 @@ router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response
       }
     }
 
+    // Backend lock check for transferred items
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    const isTransferred = existing.originPlant && existing.plant !== existing.originPlant;
+    const isLocked = !isSuperAdmin && isTransferred && req.user?.plant !== existing.originPlant;
+
     const updatedName = name !== undefined ? name.trim() : existing.name;
-    const updatedSku = sku !== undefined ? sku.trim().toUpperCase() : existing.sku;
-    const updatedModel = model !== undefined ? model : existing.model;
+    const updatedSku = (sku !== undefined && !isLocked) ? sku.trim().toUpperCase() : existing.sku;
+    const updatedModel = (model !== undefined && !isLocked) ? model : existing.model;
+    const updatedSerial = (serialNumber !== undefined && !isLocked) ? serialNumber : existing.serialNumber;
+    
     const explicitPlant = plant !== undefined ? plant.trim() : existing.plant;
     const newPlant = determinePlant(updatedName, updatedSku, updatedModel || '', explicitPlant);
     const plantChanged = newPlant !== existing.plant;
 
     let customAttrStr = existing.customAttributes;
-    if (customAttributes !== undefined) {
+    if (customAttributes !== undefined && !isLocked) {
       customAttrStr = customAttributes ? (typeof customAttributes === 'string' ? customAttributes : JSON.stringify(customAttributes)) : null;
     }
 
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
-        name: name !== undefined ? name.trim() : existing.name,
-        model: model !== undefined ? model : existing.model,
-        serialNumber: serialNumber !== undefined ? serialNumber : existing.serialNumber,
+        name: updatedName,
+        model: updatedModel,
+        serialNumber: updatedSerial,
         notes: notes !== undefined ? notes : existing.notes,
         faults: faults !== undefined ? faults : existing.faults,
         area: area !== undefined ? area : existing.area,
         ipAddress: ipAddress !== undefined ? ipAddress : existing.ipAddress,
-        sku: sku !== undefined ? sku.trim().toUpperCase() : existing.sku,
+        sku: updatedSku,
         hasWarranty: hasWarranty !== undefined ? Boolean(hasWarranty) : existing.hasWarranty,
         warrantyExpiration: warrantyExpiration !== undefined ? warrantyExpiration : existing.warrantyExpiration,
         description: description !== undefined ? description : existing.description,

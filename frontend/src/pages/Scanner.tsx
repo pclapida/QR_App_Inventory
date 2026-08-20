@@ -6,7 +6,9 @@ import { HardwareScanner } from '../components/HardwareScanner';
 import { QRCameraScanner } from '../components/QRCameraScanner';
 import { QRModal } from '../components/QRModal';
 import { ResponsivaModal } from '../components/ResponsivaModal';
+import { ChecklistModal } from '../components/ChecklistModal';
 import { DeliveryModal } from '../components/DeliveryModal';
+import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
 import {
   Scan,
   Camera,
@@ -89,6 +91,8 @@ export const Scanner: React.FC = () => {
   const [transLoading, setTransLoading] = useState<boolean>(false);
 
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
+  const [showTimelineModal, setShowTimelineModal] = useState<boolean>(false);
+  const [showChecklistModal, setShowChecklistModal] = useState<boolean>(false);
   const [showResponsivaModal, setShowResponsivaModal] = useState<boolean>(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState<boolean>(false);
 
@@ -415,8 +419,7 @@ export const Scanner: React.FC = () => {
                 No existe ningún equipo, herramienta o producto registrado con el código: <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>"{lastScannedCode}"</strong>.
               </p>
 
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>                <button
                   className="btn btn-primary"
                   onClick={() => navigate(`/add-item?name=${encodeURIComponent(lastScannedCode || '')}`)}
                   style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
@@ -590,12 +593,18 @@ export const Scanner: React.FC = () => {
                 Ver QR
               </button>
 
+              <button className="btn btn-secondary" onClick={() => setShowTimelineModal(true)} style={{ fontSize: '0.85rem', color: 'var(--coficab-blue-bright)', borderColor: 'var(--coficab-blue-bright)' }}>
+                <Clock size={16} />
+                Línea de Tiempo
+              </button>
+
               {/* Entregar Equipo — solo para equipos de IT */}
               {scannedItem.isITInternal && (
                 <button
                   className="btn btn-primary"
-                  onClick={() => setShowDeliveryModal(true)}
+                  onClick={() => setShowChecklistModal(true)}
                   style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  title="Checklist y Responsiva Digital"
                 >
                   <FileText size={16} />
                   Entregar Equipo
@@ -917,6 +926,28 @@ export const Scanner: React.FC = () => {
         </div>
       )}
 
+      {/* Modals */}
+      {showTimelineModal && scannedItem && (
+        <AssetTimelineModal
+          item={scannedItem}
+          onClose={() => setShowTimelineModal(false)}
+        />
+      )}
+
+      {showChecklistModal && scannedItem && (
+        <ChecklistModal
+          isOpen={showChecklistModal}
+          onClose={() => setShowChecklistModal(false)}
+          itemId={scannedItem.id}
+          itemName={scannedItem.name}
+          itemSku={scannedItem.sku}
+          onCompleted={() => {
+            setShowChecklistModal(false);
+            setShowDeliveryModal(true); // Proceed to delivery/responsiva
+          }}
+        />
+      )}
+
       {/* Maintenance Modal directly from Scanner */}
       {showMaintenanceModal && scannedItem && (
         <div className="modal-overlay">
@@ -1101,6 +1132,11 @@ export const Scanner: React.FC = () => {
           isOpen={showResponsivaModal}
           onClose={() => setShowResponsivaModal(false)}
           item={scannedItem}
+          onSuccess={() => {
+            setShowResponsivaModal(false);
+            setSuccessMessage('¡Responsiva y asignación completada!');
+            fetchItemDetails(scannedItem.qrCodePayload);
+          }}
         />
       )}
 

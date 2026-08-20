@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api, { adminApi } from '../services/api';
+import api, { adminApi, PLANTS, ROLE_LABELS, UserRole } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Shield,
@@ -28,7 +28,8 @@ interface SystemUser {
   username: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'USER';
+  role: UserRole | 'ADMIN'; // support legacy 'ADMIN' role
+  plant?: string | null;
   createdAt: string;
   updatedAt?: string;
   _count?: {
@@ -53,7 +54,8 @@ export const AdminDashboard: React.FC = () => {
     username: '',
     email: '',
     password: '',
-    role: 'USER' as 'ADMIN' | 'USER'
+    role: 'OPERATOR' as string,
+    plant: 'Planta 2'
   });
   const [createLoading, setCreateLoading] = useState<boolean>(false);
 
@@ -62,7 +64,8 @@ export const AdminDashboard: React.FC = () => {
   const [editUserForm, setEditUserForm] = useState({
     name: '',
     email: '',
-    role: 'USER' as 'ADMIN' | 'USER',
+    role: 'OPERATOR' as string,
+    plant: 'Planta 2',
     password: ''
   });
   const [editLoading, setEditLoading] = useState<boolean>(false);
@@ -150,7 +153,8 @@ export const AdminDashboard: React.FC = () => {
         username: '',
         email: '',
         password: '',
-        role: 'USER'
+        role: 'OPERATOR',
+        plant: 'Planta 2'
       });
       fetchUsers();
     } catch (err: any) {
@@ -166,7 +170,8 @@ export const AdminDashboard: React.FC = () => {
     setEditUserForm({
       name: u.name || '',
       email: u.email || '',
-      role: u.role || 'USER',
+      role: u.role || 'OPERATOR',
+      plant: u.plant || 'Planta 2',
       password: ''
     });
   };
@@ -182,7 +187,8 @@ export const AdminDashboard: React.FC = () => {
       const payload: any = {
         name: editUserForm.name,
         email: editUserForm.email,
-        role: editUserForm.role
+        role: editUserForm.role,
+        plant: editUserForm.plant
       };
       if (editUserForm.password.trim() !== '') {
         payload.password = editUserForm.password.trim();
@@ -227,12 +233,13 @@ export const AdminDashboard: React.FC = () => {
       u.name.toLowerCase().includes(q) ||
       u.username.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q)
+      u.role.toLowerCase().includes(q) ||
+      (u.plant ?? '').toLowerCase().includes(q)
     );
   });
 
-  const totalAdmins = users.filter((u) => u.role === 'ADMIN').length;
-  const totalStandardUsers = users.filter((u) => u.role === 'USER').length;
+  const totalAdmins = users.filter((u) => u.role === 'ADMIN' || u.role === 'ADMIN_PLANTA' || u.role === 'SUPERADMIN').length;
+  const totalStandardUsers = users.filter((u) => u.role === 'USER' || u.role === 'OPERATOR' || u.role === 'AUDITOR').length;
 
   return (
     <div style={{ paddingBottom: '3rem' }}>
@@ -470,10 +477,10 @@ export const AdminDashboard: React.FC = () => {
               <thead>
                 <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
                   <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Nombre Completo</th>
-                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Nombre de Usuario</th>
+                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Usuario</th>
                   <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Correo Electrónico</th>
-                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Rol de Permisos</th>
-                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Actividad / Movimientos</th>
+                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Rol / Planta</th>
+                  <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>Actividad</th>
                   <th style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', textAlign: 'right' }}>Acciones</th>
                 </tr>
               </thead>
@@ -495,15 +502,32 @@ export const AdminDashboard: React.FC = () => {
                       {u.email}
                     </td>
                     <td style={{ padding: '0.85rem 1rem' }}>
-                      {u.role === 'ADMIN' ? (
-                        <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid #a855f7', fontWeight: 800 }}>
-                          ADMINISTRADOR DE IT
-                        </span>
-                      ) : (
-                        <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid #3b82f6', fontWeight: 700 }}>
-                          USUARIO DE CONSULTA
-                        </span>
-                      )}
+                      {(() => {
+                        const roleBadge: Record<string, { bg: string; color: string; border: string; label: string }> = {
+                          SUPERADMIN: { bg: 'rgba(245,158,11,0.2)', color: '#f59e0b', border: '#d97706', label: '👑 Super Admin Global' },
+                          ADMIN_PLANTA: { bg: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '#a855f7', label: '🏢 Admin de Planta' },
+                          OPERATOR: { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '#3b82f6', label: '🛠️ Operador IT' },
+                          AUDITOR: { bg: 'rgba(107,114,128,0.2)', color: '#9ca3af', border: '#6b7280', label: '👁️ Auditor' },
+                          ADMIN: { bg: 'rgba(168,85,247,0.2)', color: '#c084fc', border: '#a855f7', label: '🏢 Admin IT (legado)' },
+                          USER: { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '#3b82f6', label: 'Usuario' },
+                        };
+                        const rb = roleBadge[u.role] ?? roleBadge['USER'];
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <span className="badge" style={{ background: rb.bg, color: rb.color, border: `1px solid ${rb.border}`, fontWeight: 800, fontSize: '0.75rem' }}>
+                              {rb.label}
+                            </span>
+                            {u.plant && (
+                              <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 600 }}>
+                                📍 {u.plant}
+                              </span>
+                            )}
+                            {!u.plant && u.role === 'SUPERADMIN' && (
+                              <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 600 }}>🌐 Todas las plantas</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{u._count?.transactions || 0}</span> transacciones
@@ -614,18 +638,35 @@ export const AdminDashboard: React.FC = () => {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label className="form-label" style={{ color: '#c084fc', fontWeight: 800 }}>Rol y Nivel de Permisos *</label>
                 <select
                   className="form-input"
                   value={newUserForm.role}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as 'ADMIN' | 'USER' })}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value, plant: e.target.value === 'SUPERADMIN' ? '' : newUserForm.plant })}
                   style={{ fontWeight: 700, borderColor: '#a855f7' }}
                 >
-                  <option value="USER">USUARIO DE CONSULTA (Solo Lectura, Escanear e Inspeccionar Inventario)</option>
-                  <option value="ADMIN">ADMINISTRADOR DE IT (Acceso Total: Agregar, Editar, Eliminar, Traslados y Gestión)</option>
+                  <option value="SUPERADMIN">Super Administrador Global — Acceso total a todas las plantas</option>
+                  <option value="ADMIN_PLANTA">Administrador de Planta — Control total de su planta</option>
+                  <option value="OPERATOR">Operador / Técnico IT — Préstamos, mantenimiento y escaneo</option>
+                  <option value="AUDITOR">Auditor / Solo Lectura — Sin permisos de modificación</option>
                 </select>
               </div>
+
+              {newUserForm.role !== 'SUPERADMIN' && (
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label" style={{ color: '#34d399', fontWeight: 800 }}>Planta Asignada *</label>
+                  <select
+                    className="form-input"
+                    value={newUserForm.plant}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, plant: e.target.value })}
+                    style={{ fontWeight: 700, borderColor: '#10b981' }}
+                    required
+                  >
+                    {PLANTS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
@@ -692,13 +733,30 @@ export const AdminDashboard: React.FC = () => {
                 <select
                   className="form-input"
                   value={editUserForm.role}
-                  onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value as 'ADMIN' | 'USER' })}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value, plant: e.target.value === 'SUPERADMIN' ? '' : editUserForm.plant })}
                   style={{ fontWeight: 700, borderColor: '#a855f7' }}
                 >
-                  <option value="USER">USUARIO DE CONSULTA (Solo Lectura e Inspección)</option>
-                  <option value="ADMIN">ADMINISTRADOR DE IT (Acceso Total a Alta, Edición y Bajas)</option>
+                  <option value="SUPERADMIN">Super Administrador Global — Acceso total a todas las plantas</option>
+                  <option value="ADMIN_PLANTA">Administrador de Planta — Control total de su planta</option>
+                  <option value="OPERATOR">Operador / Técnico IT — Préstamos, mantenimiento y escaneo</option>
+                  <option value="AUDITOR">Auditor / Solo Lectura — Sin permisos de modificación</option>
+                  <option value="ADMIN">ADMIN (legado) — Compatible con versión anterior</option>
                 </select>
               </div>
+
+              {editUserForm.role !== 'SUPERADMIN' && (
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label" style={{ color: '#34d399', fontWeight: 800 }}>Planta Asignada</label>
+                  <select
+                    className="form-input"
+                    value={editUserForm.plant}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, plant: e.target.value })}
+                    style={{ fontWeight: 700, borderColor: '#10b981' }}
+                  >
+                    {PLANTS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="form-label">Restablecer Contraseña (Dejar en blanco para mantener la actual)</label>

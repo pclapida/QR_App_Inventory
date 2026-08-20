@@ -1,11 +1,24 @@
 import axios from 'axios';
 
+export type UserRole = 'SUPERADMIN' | 'ADMIN_PLANTA' | 'OPERATOR' | 'AUDITOR' | 'USER';
+export const PLANTS = ['Planta 1', 'Planta 2', 'Planta 3', 'Planta UPCAST'] as const;
+export type PlantName = typeof PLANTS[number];
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  SUPERADMIN: 'Super Administrador Global',
+  ADMIN_PLANTA: 'Administrador de Planta',
+  OPERATOR: 'Operador / Técnico IT',
+  AUDITOR: 'Auditor / Solo Lectura',
+  USER: 'Usuario',
+};
+
 export interface User {
   id: string;
   email: string;
   username: string;
   name: string;
-  role: string;
+  role: UserRole;
+  plant?: string | null;
 }
 
 export interface Item {
@@ -271,6 +284,24 @@ export const adminApi = {
     const res = await api.get('/users/backup/download', { responseType: 'blob' });
     return res.data as Blob;
   }
+};
+
+// Checklist API
+export const checklistApi = {
+  getTemplate: () => api.get('/checklists/template'),
+  getByItem: (itemId: string) => api.get(`/checklists/item/${itemId}`),
+  create: (itemId: string) => api.post('/checklists', { itemId }),
+  updateItems: (checklistId: string, checklistData: any, section: string) =>
+    api.put(`/checklists/${checklistId}/items`, { checklistData, section }),
+  sign: (checklistId: string, password: string, signerUserId?: string, section?: string) =>
+    api.post(`/checklists/${checklistId}/sign`, { password, signerUserId, section }),
+  complete: (checklistId: string, password: string) =>
+    api.post(`/checklists/${checklistId}/complete`, { password }),
+};
+
+// Cross-plant global inventory search API
+export const globalSearchApi = {
+  search: (q: string) => api.get('/items/global-search', { params: { q } }),
 };
 
 export default api;

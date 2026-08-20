@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Item } from '../../services/api';
 import { SecurityUnlockModal } from '../SecurityUnlockModal';
-import { X, Check, ShieldCheck, AlertTriangle, PlusCircle, Trash2, Lock, Unlock } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { X, Check, ShieldCheck, AlertTriangle, PlusCircle, Trash2, Lock, Unlock, LockKeyhole } from 'lucide-react';
 
 export interface ItemEditFormData {
   name: string;
@@ -38,6 +39,13 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
+
+  const { isSuperAdmin, currentPlant } = useAuth();
+  
+  // If the item doesn't originally belong to this plant (and hasn't been re-purchased),
+  // and the user is NOT a SuperAdmin, lock core fields (model, serial, sku, PO).
+  const isTransferred = item.originPlant && item.plant !== item.originPlant;
+  const isLocked = !isSuperAdmin && isTransferred && currentPlant !== item.originPlant;
 
   const [formData, setFormData] = useState<ItemEditFormData>({
     name: item.name || '',
@@ -128,6 +136,17 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
           </button>
         </div>
 
+        {isLocked && (
+          <div style={{ background: 'rgba(245, 158, 11, 0.1)', borderLeft: '4px solid #f59e0b', padding: '1rem', borderRadius: '4px', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b', fontWeight: 800, marginBottom: '0.25rem' }}>
+              <LockKeyhole size={18} /> Acceso Restringido (Transferencia Multi-Planta)
+            </div>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)' }}>
+              Este equipo pertenece originalmente a <strong>{item.originPlant}</strong> y fue transferido a tu planta. Ciertos datos duros (Modelo, Serie, SKU y Órdenes de Compra) están bloqueados para proteger el registro original. Solo puedes editar datos operativos.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.2rem' }}>
 
@@ -147,6 +166,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             <div className="form-group">
               <label className="form-label">
                 2. Modelo {item.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
+                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} title="Campo bloqueado" />}
               </label>
               <input
                 type="text"
@@ -154,7 +174,11 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                 required={item.isITInternal}
-                style={item.isITInternal && !formData.model ? { borderColor: 'rgba(239,68,68,0.5)' } : undefined}
+                disabled={isLocked}
+                style={{ 
+                  ...(item.isITInternal && !formData.model ? { borderColor: 'rgba(239,68,68,0.5)' } : {}),
+                  ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {})
+                }}
               />
             </div>
 
@@ -162,6 +186,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             <div className="form-group">
               <label className="form-label">
                 3. Número de Serie {item.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
+                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} title="Campo bloqueado" />}
               </label>
               <input
                 type="text"
@@ -169,7 +194,11 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.serialNumber}
                 onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
                 required={item.isITInternal}
-                style={item.isITInternal && !formData.serialNumber ? { borderColor: 'rgba(239,68,68,0.5)' } : undefined}
+                disabled={isLocked}
+                style={{ 
+                  ...(item.isITInternal && !formData.serialNumber ? { borderColor: 'rgba(239,68,68,0.5)' } : {}),
+                  ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {})
+                }}
               />
             </div>
 
@@ -457,15 +486,18 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
                   10. Atributos y Especificaciones Personalizadas
+                  {isLocked && <LockKeyhole size={14} style={{ marginLeft: '0.5rem', color: '#f59e0b', verticalAlign: 'middle' }} title="Campo bloqueado" />}
                 </label>
-                <button
-                  type="button"
-                  onClick={handleAddCustomField}
-                  className="btn btn-secondary"
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
-                >
-                  <PlusCircle size={14} /> Añadir Nuevo Campo
-                </button>
+                {!isLocked && (
+                  <button
+                    type="button"
+                    onClick={handleAddCustomField}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                  >
+                    <PlusCircle size={14} /> Añadir Nuevo Campo
+                  </button>
+                )}
               </div>
 
               {customFields.length > 0 ? (
@@ -478,7 +510,8 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                         className="form-input"
                         value={field.key}
                         onChange={(e) => handleCustomFieldChange(idx, 'key', e.target.value)}
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {}) }}
+                        disabled={isLocked}
                       />
                       <input
                         type="text"
@@ -486,17 +519,20 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                         className="form-input"
                         value={field.value}
                         onChange={(e) => handleCustomFieldChange(idx, 'value', e.target.value)}
-                        style={{ flex: 2 }}
+                        style={{ flex: 2, ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {}) }}
+                        disabled={isLocked}
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveCustomField(idx)}
-                        className="btn btn-danger"
-                        style={{ padding: '0.45rem', minWidth: 'auto' }}
-                        title="Eliminar campo"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {!isLocked && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomField(idx)}
+                          className="btn btn-danger"
+                          style={{ padding: '0.45rem', minWidth: 'auto' }}
+                          title="Eliminar campo"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
