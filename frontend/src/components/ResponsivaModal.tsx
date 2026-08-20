@@ -42,8 +42,8 @@ async function blobUrlToBase64(url: string): Promise<string> {
   });
 }
 
-// Builds and opens a print-ready HTML page in a new window
-export async function openPrintWindow(item: Item, data: ResponsivaData) {
+// Builds the responsiva HTML string
+export async function buildResponsivaHTML(item: Item, data: ResponsivaData, isEmail: boolean = false): Promise<string> {
   const today = new Date();
   const dateStr = `${today.getDate().toString().padStart(2, '0')} / ${(today.getMonth() + 1).toString().padStart(2, '0')} / ${today.getFullYear()}`;
 
@@ -244,12 +244,17 @@ ${photosHtml}
 
 <script>
   window.onload = function() {
-    setTimeout(function() { window.print(); }, 500);
+    ${isEmail ? '' : 'setTimeout(function() { window.print(); }, 500);'}
   };
 </script>
 </body>
 </html>`;
+  return html;
+}
 
+// Builds and opens a print-ready HTML page in a new window
+export async function openPrintWindow(item: Item, data: ResponsivaData) {
+  const html = await buildResponsivaHTML(item, data, false);
   const win = window.open('', '_blank');
   if (!win) {
     alert('Por favor permite ventanas emergentes en tu navegador para imprimir el documento.');
@@ -266,11 +271,14 @@ const DocumentPreview: React.FC<{
   onSuccess?: () => void;
 }> = ({ item, data, onBack, onSuccess }) => {
   const [printing, setPrinting] = useState(false);
+  const [sendEmailCheckbox, setSendEmailCheckbox] = useState(!!data.email);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
-  const handleAssignAndPrint = async () => {
+  const handleAssign = async (print: boolean) => {
     setPrinting(true);
+    if (sendEmailCheckbox) setSendingEmail(true);
     try {
-      // 1. Asignar formalmente el equipo en la BD (actualiza assignedTo, isITInternal: false, y crea Responsiva + Transacción)
+      // 1. Asignar formalmente el equipo en la BD
       await itemsApi.assign(item.id, {
         colaborador: data.colaborador,
         area: data.area,
@@ -285,41 +293,46 @@ const DocumentPreview: React.FC<{
         signatureData: data.signatureData
       });
 
+      // 2. Si se solicitó enviar por correo
+      if (sendEmailCheckbox && data.email) {
+        try {
+          const html2pdf = (await import('html2pdf.js')).default;
+          const html = await buildResponsivaHTML(item, data, true);
+          const opt = {
+            margin:       10,
+            filename:     'Responsiva.pdf',
+            image:        { type: 'jpeg' as const, quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' as const }
+          };
+          const pdfBase64 = await html2pdf().set(opt).from(html).outputPdf('datauristring');
+          await responsivasApi.sendEmail({
+            responsivaId: null,
+            htmlContent: html,
+            toEmail: data.email,
+            colaborador: data.colaborador,
+            nombreEquipo: data.marcaModelo,
+            pdfBase64: pdfBase64
+          });
+        } catch (emailErr) {
+          console.error("Error al enviar correo:", emailErr);
+          alert("El equipo fue asignado, pero hubo un error al enviar el correo.");
+        }
+      }
+
       onSuccess?.();
-      await openPrintWindow(item, data);
+      if (print) {
+        await openPrintWindow(item, data);
+      }
     } catch (err: any) {
       console.error("Error al asignar equipo:", err);
       alert(err.response?.data?.error || "Error al procesar la asignación del equipo.");
     } finally {
       setPrinting(false);
+      setSendingEmail(false);
     }
   };
-
-  const handleAssignOnly = async () => {
-    setPrinting(true);
-    try {
-      await itemsApi.assign(item.id, {
-        colaborador: data.colaborador,
-        area: data.area,
-        badge: data.badge,
-        email: data.email,
-        marcaModelo: data.marcaModelo,
-        serie: data.serie,
-        nombreEquipo: data.nombreEquipo,
-        accesoriosJson: data.accesorios,
-        observaciones: data.estado,
-        photoUrlsJson: data.photoUrls,
-        signatureData: data.signatureData
-      });
-
-      onSuccess?.();
-    } catch (err: any) {
-      console.error("Error al asignar equipo:", err);
-      alert(err.response?.data?.error || "Error al procesar la asignación del equipo.");
-    } finally {
-      setPrinting(false);
-    }
-  };
+  const isProcessing = printing || sendingEmail;
 
   const today = new Date();
   const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
@@ -353,22 +366,26 @@ const DocumentPreview: React.FC<{
           Vista previa — <strong style={{ color: '#fff' }}>{data.colaborador}</strong>
         </span>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: isProcessing || !data.email ? 'not-allowed' : 'pointer', opacity: !data.email ? 0.5 : 1, marginRight: '1rem' }}>
+            <input type="checkbox" checked={sendEmailCheckbox} onChange={e => setSendEmailCheckbox(e.target.checked)} disabled={isProcessing || !data.email} />
+            <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>Enviar PDF por correo</span>
+          </label>
           <button
-            onClick={handleAssignOnly}
+            onClick={() => handleAssign(false)}
             className="btn btn-secondary"
-            disabled={printing}
+            disabled={isProcessing}
             style={{ padding: '0.5rem 0.85rem', fontSize: '0.86rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
           >
             <CheckCircle2 size={15} /> Solo Guardar Asignación
           </button>
           <button
-            onClick={handleAssignAndPrint}
+            onClick={() => handleAssign(true)}
             className="btn btn-primary"
-            disabled={printing}
+            disabled={isProcessing}
             style={{ padding: '0.5rem 1.1rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Printer size={16} />
-            {printing ? 'Asignando e imprimiendo...' : 'Confirmar Asignación & Imprimir (PDF)'}
+            {isProcessing ? 'Procesando...' : 'Asignar e Imprimir (PDF)'}
           </button>
         </div>
       </div>

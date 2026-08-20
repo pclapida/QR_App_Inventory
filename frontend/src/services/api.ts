@@ -235,7 +235,7 @@ export const responsivasApi = {
     const res = await api.post('/responsivas', data);
     return res.data as ResponsivaHistory;
   },
-  sendEmail: async (payload: { responsivaId: string | null; htmlContent: string; toEmail: string; colaborador: string; nombreEquipo: string }) => {
+  sendEmail: async (payload: { responsivaId: string | null; htmlContent: string; toEmail: string; colaborador: string; nombreEquipo: string; pdfBase64?: string }) => {
     const res = await api.post('/responsivas/send-email', payload);
     return res.data as { success: boolean; message: string };
   }

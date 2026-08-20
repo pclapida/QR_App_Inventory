@@ -16,13 +16,22 @@ import {
   Building
 } from 'lucide-react';
 import { responsivasApi, ResponsivaHistory } from '../services/api';
-import { openPrintWindow } from '../components/ResponsivaModal';
+import { openPrintWindow, buildResponsivaHTML } from '../components/ResponsivaModal';
+import { X, Send as SendIcon } from 'lucide-react';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 
 export const ResponsivasHistory: React.FC = () => {
   const [history, setHistory] = useState<ResponsivaHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SENT' | 'PENDING'>('ALL');
+
+  // Email Modal State
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<ResponsivaHistory | null>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -55,6 +64,60 @@ export const ResponsivasHistory: React.FC = () => {
       photoUrls: JSON.parse(record.photoUrlsJson || '[]')
     };
     await openPrintWindow(record.item, data);
+  };
+
+  const openEmailModal = (record: ResponsivaHistory) => {
+    setSelectedRecord(record);
+    setEmailInput(record.email || '');
+    setEmailModalOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedRecord || !emailInput || !selectedRecord.item) {
+      if (!selectedRecord?.item) alert("No se puede enviar correo porque el equipo original ya no existe.");
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const data = {
+        colaborador: selectedRecord.colaborador,
+        marcaModelo: selectedRecord.marcaModelo,
+        serie: selectedRecord.serie,
+        nombreEquipo: selectedRecord.nombreEquipo,
+        accesorios: JSON.parse(selectedRecord.accesoriosJson || '{}'),
+        estado: selectedRecord.observaciones || '',
+        photoUrls: JSON.parse(selectedRecord.photoUrlsJson || '[]')
+      };
+
+      const html = await buildResponsivaHTML(selectedRecord.item, data, true);
+      const opt = {
+        margin:       10,
+        filename:     'Responsiva.pdf',
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' as const }
+      };
+      const pdfBase64 = await html2pdf().set(opt).from(html).outputPdf('datauristring');
+
+      await responsivasApi.sendEmail({
+        responsivaId: selectedRecord.id,
+        htmlContent: html,
+        toEmail: emailInput,
+        colaborador: selectedRecord.colaborador,
+        nombreEquipo: selectedRecord.marcaModelo,
+        pdfBase64: pdfBase64
+      });
+      
+      // Update local state to reflect email sent
+      setHistory(prev => prev.map(r => r.id === selectedRecord.id ? { ...r, emailSent: true, email: emailInput } : r));
+      setEmailModalOpen(false);
+      alert('Correo enviado exitosamente.');
+    } catch (err: any) {
+      console.error('Error enviando correo', err);
+      alert(err.response?.data?.error || 'Error al enviar el correo.');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const filteredHistory = useMemo(() => {
@@ -228,19 +291,89 @@ export const ResponsivasHistory: React.FC = () => {
                     )}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                    <button
-                      onClick={() => handleReprint(record)}
-                      className="btn btn-secondary"
-                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
-                    >
-                      <Printer size={14} />
-                      Reimprimir
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => openEmailModal(record)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'var(--coficab-blue-bright)', color: 'var(--coficab-blue-bright)', fontWeight: 700 }}
+                        title="Enviar por Correo"
+                      >
+                        <Send size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleReprint(record)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
+                      >
+                        <Printer size={14} />
+                        Reimprimir
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {emailModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="liquid-glass-card" style={{ width: '400px', maxWidth: '90%', padding: '1.5rem', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Mail size={20} color="var(--primary)" />
+                Enviar Responsiva
+              </h3>
+              <button onClick={() => setEmailModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Por favor, confirma o actualiza el correo electrónico al que deseas enviar la responsiva de <strong>{selectedRecord?.colaborador}</strong>.
+            </p>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                Correo Electrónico Destino
+              </label>
+              <input
+                type="email"
+                className="form-input"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                placeholder="ejemplo@correo.com"
+                style={{ width: '100%' }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setEmailModalOpen(false)}
+                className="btn btn-secondary"
+                disabled={isSendingEmail}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSendEmail}
+                className="btn btn-primary"
+                disabled={isSendingEmail || !emailInput}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                {isSendingEmail ? (
+                  <>Procesando...</>
+                ) : (
+                  <>
+                    <SendIcon size={16} /> Enviar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

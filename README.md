@@ -13,6 +13,7 @@ Sistema de inventario con código QR para gestión de equipos de TI y operativos
 - **Buscador Global (Inter-Planta)** — Localiza números de serie a través de cualquier planta del grupo instantáneamente.
 - **Transacciones Seguras** — Historial completo (Línea de Tiempo). En préstamos entre plantas, la planta receptora no puede alterar datos duros (SKU, Modelo, Serie) protegiendo la orden de compra original.
 - **Responsiva Digital** — Generación automática de cartas responsivas listas para firmar o imprimir.
+- **Envío Automático por Correo** — Capacidad para enviar responsivas digitales (PDF) automáticamente al correo electrónico asignado.
 - **Mantenimientos** — Registro de bitácoras de servicio preventivo y correctivo.
 
 ---
