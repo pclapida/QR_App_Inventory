@@ -1135,7 +1135,9 @@ export const Scanner: React.FC = () => {
           onSuccess={() => {
             setShowResponsivaModal(false);
             setSuccessMessage('¡Responsiva y asignación completada!');
-            fetchItemDetails(scannedItem.qrCodePayload);
+            if (scannedItem?.qrCodePayload) {
+              handleScanCode(scannedItem.qrCodePayload);
+            }
           }}
         />
       )}

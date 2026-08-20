@@ -1,12 +1,13 @@
 import axios from 'axios';
 
-export type UserRole = 'SUPERADMIN' | 'ADMIN_PLANTA' | 'OPERATOR' | 'AUDITOR' | 'USER';
+export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'ADMIN_PLANTA' | 'OPERATOR' | 'AUDITOR' | 'USER';
 export const PLANTS = ['Planta 1', 'Planta 2', 'Planta 3', 'Planta UPCAST'] as const;
 export type PlantName = typeof PLANTS[number];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   SUPERADMIN: 'Super Administrador Global',
   ADMIN_PLANTA: 'Administrador de Planta',
+  ADMIN: 'Administrador (Legacy)',
   OPERATOR: 'Operador / Técnico IT',
   AUDITOR: 'Auditor / Solo Lectura',
   USER: 'Usuario',

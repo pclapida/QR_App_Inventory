@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { Item, itemsApi, DeviceLoan, loansApi } from '../services/api';
@@ -6,12 +6,15 @@ import { QRModal } from '../components/QRModal';
 import { ItemEditModal, ItemEditFormData } from '../components/inventory/ItemEditModal';
 import { ItemDetailModal } from '../components/inventory/ItemDetailModal';
 import { DecommissionModal } from '../components/inventory/DecommissionModal';
-import { AssetTimelineModal } from '../components/inventory/AssetTimelineModal';
-import { InventoryReportModal } from '../components/inventory/InventoryReportModal';
-import { ThermalLabelModal } from '../components/ThermalLabelModal';
-import { ResponsivaModal } from '../components/ResponsivaModal';
-import { ChecklistModal } from '../components/ChecklistModal';
+import { InventoryTable } from '../components/inventory/InventoryTable';
 import { printQRLabels } from '../utils/printLabels';
+
+// Lazy loaded heavy modals
+const AssetTimelineModal = lazy(() => import('../components/inventory/AssetTimelineModal').then(module => ({ default: module.AssetTimelineModal })));
+const InventoryReportModal = lazy(() => import('../components/inventory/InventoryReportModal').then(module => ({ default: module.InventoryReportModal })));
+const ThermalLabelModal = lazy(() => import('../components/ThermalLabelModal').then(module => ({ default: module.ThermalLabelModal })));
+const ResponsivaModal = lazy(() => import('../components/ResponsivaModal').then(module => ({ default: module.ResponsivaModal })));
+const ChecklistModal = lazy(() => import('../components/ChecklistModal').then(module => ({ default: module.ChecklistModal })));
 import {
   Package,
   Search,
@@ -63,6 +66,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   // Backward compatible role check for actions
   const isAdmin = canEdit || user?.role === 'ADMIN';
   const isSuper = canDelete || user?.role === 'ADMIN';
+  const isOperator = user?.role === 'OPERATOR';
 
   // 6 Tabs: ASSIGNED, AVAILABLE, LOANS, SCRAP, TRANSFERS, DAMAGED
   const [activeTab, setActiveTab] = useState<InventoryTabType>(() => {
@@ -82,6 +86,12 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPlant, setSelectedPlant] = useState<string>('');
   const [onlyLowStock, setOnlyLowStock] = useState<boolean>(false);
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [limit] = useState<number>(50);
+
   const [error, setError] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
@@ -130,12 +140,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   // Batch Print selection state
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
-  // Accordion state for categories
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
-  };
 
   const fetchItems = async () => {
     setLoading(true);
@@ -152,14 +157,19 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         if (searchQuery.trim()) params.q = searchQuery.trim();
         if (selectedCategory) params.category = selectedCategory;
         if (selectedPlant) params.plant = selectedPlant;
-
+        if (onlyLowStock && activeTab === 'AVAILABLE') params.lowStock = 'true';
+        
+        params.page = currentPage;
+        params.limit = limit;
         params.tab = activeTab;
 
         const res = await itemsApi.getAll(params);
         let resultItems: Item[] = Array.isArray(res) ? res : (res?.items || []);
-
-        if (onlyLowStock && activeTab === 'AVAILABLE') {
-          resultItems = resultItems.filter((item) => (item.stock === 0) || (item.minStock > 0 && item.stock <= item.minStock));
+        
+        if (res && res.totalPages) {
+          setTotalPages(res.totalPages);
+        } else {
+          setTotalPages(1);
         }
 
         setItems(resultItems);
@@ -173,12 +183,16 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedPlant, onlyLowStock, activeTab]);
+
+  useEffect(() => {
     const delayDebounce = setTimeout(() => {
       fetchItems();
     }, 250);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedCategory, selectedPlant, onlyLowStock, activeTab]);
+  }, [searchQuery, selectedCategory, selectedPlant, onlyLowStock, activeTab, currentPage]);
 
   // Handle Unassign (Return to IT Available)
   const handleUnassignItem = async (item: Item) => {
@@ -358,15 +372,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
     return items.filter(i => (i.stock === 0) || (i.minStock > 0 && i.stock <= i.minStock)).length;
   }, [items]);
 
-  // Group items by category
-  const groupedItems = useMemo(() => {
-    return items.reduce((acc, item) => {
-      const cat = item.category || 'Sin Categoría';
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(item);
-      return acc;
-    }, {} as Record<string, Item[]>);
-  }, [items]);
+
 
   // Filtered loans list for LOANS tab
   const filteredLoans = useMemo(() => {
@@ -947,338 +953,51 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         </div>
       ) : (
         /* ========================================================================= */
-        /* TABS 1, 2, 4, 5, 6: ITEM TABLES ACCORDION                                 */
+        /* TABS 1, 2, 4, 5, 6: ITEM TABLES                                           */
         /* ========================================================================= */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {Object.keys(groupedItems).length === 0 ? (
-            <div className="glass-panel" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Package size={44} style={{ color: 'var(--text-dim)', margin: '0 auto 0.75rem auto' }} />
-              <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.05rem' }}>
-                No se encontraron artículos en esta vista
-              </div>
-              <p style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>
-                {activeTab === 'AVAILABLE' && 'No hay equipos disponibles en el taller de IT. Registra uno nuevo con el botón superior.'}
-                {activeTab === 'ASSIGNED' && 'No hay equipos asignados actualmente.'}
-                {activeTab === 'SCRAP' && 'No hay equipos dados de baja o en scrap.'}
-                {activeTab === 'TRANSFERS' && 'No hay equipos transferidos entre plantas.'}
-                {activeTab === 'DAMAGED' && '¡Excelente! No hay equipos reportados con daños o fallas en este momento.'}
-              </p>
+          <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+            <InventoryTable 
+              items={items}
+              activeTab={activeTab}
+              permissions={{ isAdmin, isSuper, isOperator }}
+              selection={{ selectedItemIds, setSelectedItemIds }}
+              actions={{
+                onViewItem: setViewingItem,
+                onAssign: setChecklistPendingItem,
+                onUnassign: handleUnassignItem,
+                onReportFault: setFaultReportItem,
+                onRepair: handleRepairItem,
+                onTransfer: setTransferringItem,
+                onReactivate: handleReactivateItem,
+                onShowQR: setSelectedQRItem,
+                onEdit: setEditingItem,
+                onDecommission: setDecommissionItem,
+                onPermanentDelete: setPermanentDeleteItem,
+              }}
+            />
+          </div>
+          
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+              <button 
+                className="btn btn-secondary" 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              >
+                Anterior
+              </button>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Página <strong style={{ color: 'var(--text-main)' }}>{currentPage}</strong> de {totalPages}
+              </span>
+              <button 
+                className="btn btn-secondary" 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              >
+                Siguiente
+              </button>
             </div>
-          ) : (
-            Object.entries(groupedItems).map(([categoryName, catItems]) => {
-              const isExpanded = expandedCategories[categoryName] !== false; // default expanded
-              return (
-                <div key={categoryName} className="glass-panel" style={{ overflow: 'hidden' }}>
-                  {/* Category Header Bar */}
-                  <div
-                    onClick={() => toggleCategory(categoryName)}
-                    style={{
-                      padding: '0.85rem 1.25rem',
-                      background: 'var(--bg-input)',
-                      borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <ChevronRight
-                        size={18}
-                        style={{
-                          color: 'var(--text-muted)',
-                          transform: isExpanded ? 'rotate(90deg)' : 'none',
-                          transition: 'transform 0.15s ease'
-                        }}
-                      />
-                      <strong style={{ fontSize: '0.98rem', color: 'var(--text-main)' }}>{categoryName}</strong>
-                      <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
-                        {catItems.length} {catItems.length === 1 ? 'artículo' : 'artículos'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                        Stock Total: <strong style={{ color: 'var(--text-main)' }}>{catItems.reduce((s, i) => s + i.stock, 0)}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Items Table */}
-                  {isExpanded && (
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', textAlign: 'left' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)' }}>
-                            <th style={{ padding: '0.75rem 1rem', width: '40px' }}>
-                              <input
-                                type="checkbox"
-                                checked={catItems.every(i => selectedItemIds.has(i.id))}
-                                onChange={(e) => {
-                                  const updated = new Set(selectedItemIds);
-                                  catItems.forEach(i => {
-                                    if (e.target.checked) updated.add(i.id);
-                                    else updated.delete(i.id);
-                                  });
-                                  setSelectedItemIds(updated);
-                                }}
-                              />
-                            </th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Artículo / SKU</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Modelo & Serie</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>
-                              {activeTab === 'ASSIGNED' ? 'Colaborador Asignado' : activeTab === 'TRANSFERS' ? 'Ubicación vs Origen' : activeTab === 'SCRAP' ? 'Motivo de Baja' : activeTab === 'DAMAGED' ? 'Falla / Daño Reportado' : 'Stock'}
-                            </th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Planta / Área</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {catItems.map((item) => (
-                            <tr
-                              key={item.id}
-                              style={{
-                                borderBottom: '1px solid var(--border-color)',
-                                background: selectedItemIds.has(item.id) ? 'rgba(0, 43, 144, 0.08)' : undefined
-                              }}
-                            >
-                              {/* Checkbox */}
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedItemIds.has(item.id)}
-                                  onChange={(e) => {
-                                    const updated = new Set(selectedItemIds);
-                                    if (e.target.checked) updated.add(item.id);
-                                    else updated.delete(item.id);
-                                    setSelectedItemIds(updated);
-                                  }}
-                                />
-                              </td>
-
-                              {/* Name & SKU */}
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <div
-                                  onClick={() => setViewingItem(item)}
-                                  style={{ fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer' }}
-                                  className="hover-underline"
-                                >
-                                  {item.name}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--coficab-copper)', fontWeight: 700 }}>
-                                  {item.sku}
-                                </div>
-                              </td>
-
-                              {/* Model & Serial */}
-                              <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
-                                <div>{item.model || 'S/M'}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>S/N: {item.serialNumber || 'N/A'}</div>
-                              </td>
-
-                              {/* Dynamic Column by Tab */}
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                {activeTab === 'ASSIGNED' && (
-                                  <div>
-                                    <strong style={{ color: 'var(--text-main)' }}>{item.assignedTo || 'No especificado'}</strong>
-                                    {item.assignedBadge && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Nómina: #{item.assignedBadge}</div>}
-                                  </div>
-                                )}
-                                {activeTab === 'AVAILABLE' && (
-                                  <div>
-                                    <strong style={{ color: item.stock <= item.minStock && item.minStock > 0 ? '#f59e0b' : '#10b981', fontSize: '0.95rem' }}>
-                                      {item.stock} {item.unit}
-                                    </strong>
-                                    {item.minStock > 0 && (
-                                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Mínimo: {item.minStock}</div>
-                                    )}
-                                  </div>
-                                )}
-                                {activeTab === 'SCRAP' && (
-                                  <div>
-                                    <span className="badge badge-outbound" style={{ fontSize: '0.7rem' }}>Baja / Scrap</span>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                                      {item.decommissionReason || 'Desincorporado'} {item.decommissionActNumber ? `(${item.decommissionActNumber})` : ''}
-                                    </div>
-                                  </div>
-                                )}
-                                {activeTab === 'TRANSFERS' && (
-                                  <div>
-                                    <div style={{ color: 'var(--text-main)', fontWeight: 700 }}>{item.plant}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                      Origen: <strong>{item.originPlant || 'Planta 2'}</strong>
-                                    </div>
-                                  </div>
-                                )}
-                                {activeTab === 'DAMAGED' && (
-                                  <div>
-                                    <span className="badge badge-warning" style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.18)', color: '#f59e0b', borderColor: '#f59e0b' }}>
-                                      ⚠️ {item.faults || 'Falla / Daño reportado'}
-                                    </span>
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Plant / Location */}
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-main)' }}>
-                                  <MapPin size={14} style={{ color: 'var(--primary)' }} />
-                                  <span>{item.plant}</span>
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                  {item.location || item.area || (item.isITInternal ? 'Taller IT' : 'Piso Operativo')}
-                                </div>
-                              </td>
-
-                              {/* Actions Column */}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.35rem' }}>
-                                  {/* Action: Assign to Collaborator (AVAILABLE tab) */}
-                                  {activeTab === 'AVAILABLE' && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-primary"
-                                      onClick={() => setChecklistPendingItem(item)}
-                                      title="Asignar Equipo (Genera Responsiva y Checklist)"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'var(--coficab-copper)', borderColor: 'var(--coficab-copper)' }}
-                                    >
-                                      <FileText size={14} /> Asignar
-                                    </button>
-                                  )}
-
-                                  {/* Action: Unassign / Return to IT (ASSIGNED tab) */}
-                                  {activeTab === 'ASSIGNED' && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => handleUnassignItem(item)}
-                                      title="Retirar equipo y devolver al taller de IT"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--coficab-copper)' }}
-                                    >
-                                      <Undo2 size={14} /> Devolver
-                                    </button>
-                                  )}
-
-                                  {/* Action: Report Fault (AVAILABLE & ASSIGNED tabs) */}
-                                  {(activeTab === 'AVAILABLE' || activeTab === 'ASSIGNED') && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => {
-                                        setFaultReportItem(item);
-                                        setFaultDescription('');
-                                        setFaultNotes('');
-                                      }}
-                                      title="Reportar Daño o Falla Técnica"
-                                      style={{ padding: '0.35rem 0.55rem', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)' }}
-                                    >
-                                      <AlertTriangle size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* Action: Repair / Return to Disponible (DAMAGED tab) */}
-                                  {activeTab === 'DAMAGED' && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => handleRepairItem(item)}
-                                      title="Marcar como reparado y regresar al Inventario Disponible"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)', fontWeight: 700 }}
-                                    >
-                                      <CheckSquare size={14} /> Reparado
-                                    </button>
-                                  )}
-
-                                  {/* Action: Plant Transfer */}
-                                  {activeTab !== 'SCRAP' && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => {
-                                        setTransferringItem(item);
-                                        setTargetPlant(item.plant === 'Planta 2' ? 'Planta UPCAST' : 'Planta 2');
-                                      }}
-                                      title="Trasladar a otra planta"
-                                      style={{ padding: '0.35rem 0.55rem' }}
-                                    >
-                                      <Truck size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* Action: Reactivate (SCRAP tab only) */}
-                                  {activeTab === 'SCRAP' && isAdmin && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => handleReactivateItem(item)}
-                                      title="Reactivar activo al Inventario Disponible"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
-                                    >
-                                      <RotateCcw size={14} /> Reactivar
-                                    </button>
-                                  )}
-
-                                  {/* Action: QR Modal */}
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setSelectedQRItem(item)}
-                                    title="Ver Código QR"
-                                    style={{ padding: '0.35rem 0.55rem' }}
-                                  >
-                                    <QrCode size={14} />
-                                  </button>
-
-                                  {/* Action: Edit */}
-                                  {isAdmin && activeTab !== 'SCRAP' && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => setEditingItem(item)}
-                                      title="Editar Artículo"
-                                      style={{ padding: '0.35rem 0.55rem' }}
-                                    >
-                                      <Edit size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* Action: Decommission / Scrap (In AVAILABLE, ASSIGNED, TRANSFERS, DAMAGED) */}
-                                  {isAdmin && activeTab !== 'SCRAP' && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => setDecommissionItem(item)}
-                                      title="Dar de Baja / Enviar a Scrap"
-                                      style={{ padding: '0.35rem 0.55rem', color: '#f43f5e' }}
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
-
-                                  {/* Action: Permanent Delete ONLY in SCRAP tab */}
-                                  {isSuper && activeTab === 'SCRAP' && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-secondary"
-                                      onClick={() => setPermanentDeleteItem(item)}
-                                      title="Eliminar Definitivamente de la Base de Datos"
-                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: '#ef4444' }}
-                                    >
-                                      <Trash2 size={14} /> Purgar BD
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })
           )}
         </div>
       )}
@@ -1286,6 +1005,8 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
       {/* ========================================================================= */}
       {/* MODALS SECTION                                                            */}
       {/* ========================================================================= */}
+
+      <Suspense fallback={null}>
 
       {/* 0. Checklist Modal (Pre-Assignment Flow) */}
       {checklistPendingItem && (
@@ -1317,6 +1038,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           }}
         />
       )}
+      </Suspense>
 
       {/* 2. QR Modal */}
       {selectedQRItem && (
@@ -1373,6 +1095,8 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
         />
       )}
 
+      <Suspense fallback={null}>
+
       {/* 6. Timeline Modal */}
       {timelineItem && (
         <AssetTimelineModal
@@ -1405,6 +1129,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           onClose={() => setShowReportModal(false)}
         />
       )}
+      </Suspense>
 
       {/* 9. Plant Transfer Modal */}
       {transferringItem && (

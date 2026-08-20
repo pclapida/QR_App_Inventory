@@ -47,6 +47,16 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(400).json({ error: 'El nombre, nombre de usuario y contraseña son obligatorios' });
     }
 
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin) {
+      if (role === ROLES.SUPERADMIN) {
+        return res.status(403).json({ error: 'No tienes permisos para crear un SUPERADMIN' });
+      }
+      if (plant !== req.user?.plant) {
+        return res.status(403).json({ error: 'Solo puedes crear usuarios para tu propia planta' });
+      }
+    }
+
     if (password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
@@ -114,6 +124,19 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin) {
+      if (existing.plant !== req.user?.plant) {
+        return res.status(403).json({ error: 'No tienes permisos para editar usuarios de otras plantas' });
+      }
+      if (role === ROLES.SUPERADMIN) {
+        return res.status(403).json({ error: 'No tienes permisos para asignar el rol de SUPERADMIN' });
+      }
+      if (plant !== undefined && plant !== req.user?.plant) {
+        return res.status(403).json({ error: 'No puedes mover usuarios a otras plantas' });
+      }
+    }
+
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
     if (email !== undefined) updateData.email = email.trim().toLowerCase();
@@ -167,6 +190,16 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin) {
+      if (existing.role === ROLES.SUPERADMIN) {
+        return res.status(403).json({ error: 'No tienes permisos para eliminar a un SUPERADMIN' });
+      }
+      if (existing.plant !== req.user?.plant) {
+        return res.status(403).json({ error: 'No puedes eliminar usuarios de otras plantas' });
+      }
     }
 
     await prisma.user.delete({ where: { id } });

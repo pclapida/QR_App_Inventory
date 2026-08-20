@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import api, { Item } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { SecurityUnlockModal } from '../SecurityUnlockModal';
 import {
   Package,
@@ -45,6 +46,9 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
   const [unlockedKeys, setUnlockedKeys] = useState<{ bitlockerKey?: string | null; devicePassword?: string | null } | null>(null);
   const isDecommissioned = item.status === 'DECOMMISSIONED';
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const isMyPlant = isSuperAdmin || item.plant === user?.plant;
 
   const handleUnlockSuccess = async () => {
     setShowUnlockModal(false);
@@ -307,7 +311,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </button>
             )}
 
-            {isAdmin && !isDecommissioned && onOpenDecommission && (
+            {isAdmin && !isDecommissioned && onOpenDecommission && isMyPlant && (
               <button
                 className="btn btn-danger"
                 onClick={() => {
@@ -321,7 +325,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               </button>
             )}
 
-            {isAdmin && isDecommissioned && onReactivate && (
+            {isAdmin && isDecommissioned && onReactivate && isMyPlant && (
               <button
                 className="btn btn-success"
                 onClick={() => {
@@ -337,7 +341,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {isAdmin && (
+            {isAdmin && isMyPlant && (
               <button
                 className="btn btn-secondary"
                 onClick={() => {

@@ -166,7 +166,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             <div className="form-group">
               <label className="form-label">
                 2. Modelo {item.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
-                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} title="Campo bloqueado" />}
+                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} />}
               </label>
               <input
                 type="text"
@@ -174,7 +174,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                 required={item.isITInternal}
-                disabled={isLocked}
+                disabled={Boolean(isLocked)}
                 style={{ 
                   ...(item.isITInternal && !formData.model ? { borderColor: 'rgba(239,68,68,0.5)' } : {}),
                   ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {})
@@ -186,7 +186,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
             <div className="form-group">
               <label className="form-label">
                 3. Número de Serie {item.isITInternal ? <span style={{ color: '#ef4444', fontWeight: 800 }}>* (Obligatorio IT)</span> : ''}
-                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} title="Campo bloqueado" />}
+                {isLocked && <LockKeyhole size={12} style={{ marginLeft: '0.25rem', color: '#f59e0b' }} />}
               </label>
               <input
                 type="text"
@@ -194,7 +194,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.serialNumber}
                 onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
                 required={item.isITInternal}
-                disabled={isLocked}
+                disabled={Boolean(isLocked)}
                 style={{ 
                   ...(item.isITInternal && !formData.serialNumber ? { borderColor: 'rgba(239,68,68,0.5)' } : {}),
                   ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {})
@@ -486,7 +486,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
                   10. Atributos y Especificaciones Personalizadas
-                  {isLocked && <LockKeyhole size={14} style={{ marginLeft: '0.5rem', color: '#f59e0b', verticalAlign: 'middle' }} title="Campo bloqueado" />}
+                  {isLocked && <LockKeyhole size={14} style={{ marginLeft: '0.5rem', color: '#f59e0b', verticalAlign: 'middle' }} />}
                 </label>
                 {!isLocked && (
                   <button
@@ -511,7 +511,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                         value={field.key}
                         onChange={(e) => handleCustomFieldChange(idx, 'key', e.target.value)}
                         style={{ flex: 1, ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {}) }}
-                        disabled={isLocked}
+                        disabled={Boolean(isLocked)}
                       />
                       <input
                         type="text"
@@ -520,7 +520,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                         value={field.value}
                         onChange={(e) => handleCustomFieldChange(idx, 'value', e.target.value)}
                         style={{ flex: 2, ...(isLocked ? { background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 } : {}) }}
-                        disabled={isLocked}
+                        disabled={Boolean(isLocked)}
                       />
                       {!isLocked && (
                         <button

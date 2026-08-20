@@ -231,7 +231,7 @@ router.get('/global-search', async (req: AuthenticatedRequest, res: Response) =>
 // GET /api/items - List all items with optional pagination and filters
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { q, category, plant, isITInternal, status, tab, page, limit } = req.query;
+    const { q, category, plant, isITInternal, status, tab, page, limit, lowStock } = req.query;
     const whereClause: any = {};
 
     // Tab-based filtering for the 6-state lifecycle
@@ -292,6 +292,11 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
         { qrCodePayload: { contains: query, mode: 'insensitive' } },
         { id: { contains: query, mode: 'insensitive' } }
       ];
+    }
+
+    if (lowStock === 'true') {
+      const lowStockIds = await prisma.$queryRaw<{id: string}[]>`SELECT id FROM "Item" WHERE stock = 0 OR ("minStock" > 0 AND stock <= "minStock")`;
+      whereClause.id = { in: lowStockIds.map(row => row.id) };
     }
 
     // Pagination — defaults to no limit for backwards compatibility when page not provided
@@ -593,6 +598,11 @@ router.post('/:id/assign', requireAdmin, async (req: AuthenticatedRequest, res: 
       return res.status(404).json({ error: 'Artículo no encontrado.' });
     }
 
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para asignar artículos de otras plantas.' });
+    }
+
     const updatedItem = await prisma.$transaction(async (tx) => {
       const updated = await tx.item.update({
         where: { id },
@@ -660,6 +670,11 @@ router.post('/:id/unassign', requireAdmin, async (req: AuthenticatedRequest, res
       return res.status(404).json({ error: 'Artículo no encontrado.' });
     }
 
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para desasignar artículos de otras plantas.' });
+    }
+
     const previousOwner = item.assignedTo || 'Colaborador';
 
     const updatedItem = await prisma.$transaction(async (tx) => {
@@ -698,7 +713,7 @@ router.post('/:id/unassign', requireAdmin, async (req: AuthenticatedRequest, res
 });
 
 // POST /api/items/:id/report-fault - Mark an item as damaged with fault description
-router.post('/:id/report-fault', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/report-fault', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { faults, notes } = req.body;
@@ -710,6 +725,11 @@ router.post('/:id/report-fault', requireAdmin, async (req: AuthenticatedRequest,
     const item = await prisma.item.findUnique({ where: { id } });
     if (!item) {
       return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para modificar artículos de otras plantas.' });
     }
 
     const updatedItem = await prisma.$transaction(async (tx) => {
@@ -752,6 +772,11 @@ router.post('/:id/repair', requireAdmin, async (req: AuthenticatedRequest, res: 
     const item = await prisma.item.findUnique({ where: { id } });
     if (!item) {
       return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para reparar artículos de otras plantas.' });
     }
 
     const previousFault = item.faults || 'Falla técnica';
@@ -801,6 +826,11 @@ router.post('/:id/transfer', requireAdmin, async (req: AuthenticatedRequest, res
     const existing = await prisma.item.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Artículo no encontrado' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && existing.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para transferir artículos de otras plantas.' });
     }
 
     const fromPlant = existing.plant;
@@ -980,6 +1010,11 @@ router.post('/:id/decommission', requireAdmin, async (req: AuthenticatedRequest,
       return res.status(404).json({ error: 'Artículo no encontrado.' });
     }
 
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para dar de baja artículos de otras plantas.' });
+    }
+
     const year = new Date().getFullYear();
     const randomSuffix = uuidv4().split('-')[0].toUpperCase();
     const finalActNumber = decommissionActNumber && decommissionActNumber.trim()
@@ -1037,6 +1072,11 @@ router.post('/:id/reactivate', requireAdmin, async (req: AuthenticatedRequest, r
     const item = await prisma.item.findUnique({ where: { id } });
     if (!item) {
       return res.status(404).json({ error: 'Artículo no encontrado.' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && item.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para reactivar artículos de otras plantas.' });
     }
 
     const stockVal = newStock !== undefined ? parseInt(newStock, 10) : 1;
@@ -1191,6 +1231,11 @@ router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Respo
     const existing = await prisma.item.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json({ error: 'Artículo no encontrado' });
+    }
+
+    const isSuperAdmin = req.user?.role === ROLES.SUPERADMIN;
+    if (!isSuperAdmin && existing.plant !== req.user?.plant) {
+      return res.status(403).json({ error: 'No tienes permisos para eliminar artículos de otras plantas.' });
     }
 
     // Safety rule: Items must be in SCRAP / DECOMMISSIONED state before being permanently purged
