@@ -12,7 +12,7 @@ export const AddItem: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
+    if (user && user.role !== 'ADMIN_PLANTA' && user.role !== 'SUPERADMIN') {
       navigate('/inventory');
     }
   }, [user, navigate]);

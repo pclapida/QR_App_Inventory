@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, CheckCircle2, Clock, AlertCircle, Lock,
-  User, ChevronRight, Loader2, Eye, EyeOff, Shield
+  User, ChevronRight, Loader2, Eye, EyeOff, Shield, Plus, Trash2, Check
 } from 'lucide-react';
 import { checklistApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -206,21 +206,59 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
   useEffect(() => { loadChecklist(); }, [loadChecklist]);
 
   const handleValueChange = async (section: 'sectionA' | 'sectionB', itemId: number, value: CheckValue | null) => {
-    if (!data || !checklist || checklist.status !== 'IN_PROGRESS') return;
-    const newData: ChecklistData = {
+    if (!data || !checklist) return;
+    const newData = {
       ...data,
-      [section]: data[section].map(i => i.id === itemId ? { ...i, value } : i)
+      [section]: data[section].map((i: any) => i.id === itemId ? { ...i, value } : i)
     };
     setData(newData);
-
-    setSaving(true);
     try {
-      const res = await checklistApi.updateItems(checklist.id, newData, section);
-      setSignatures(JSON.parse(res.data.checklist.signaturesJson || '[]'));
+      await checklistApi.updateItems(checklist.id, newData, section);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al guardar');
-    } finally {
-      setSaving(false);
+      console.error(err);
+    }
+  };
+
+  const handleAddItem = async (section: 'sectionA' | 'sectionB', label: string) => {
+    if (!data || !checklist || !label.trim()) return;
+    const newItem = { id: Date.now(), label: label.trim(), value: null };
+    const newData = {
+      ...data,
+      [section]: [...data[section], newItem]
+    };
+    setData(newData);
+    try {
+      await checklistApi.updateItems(checklist.id, newData, section);
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  const handleRemoveItem = async (section: 'sectionA' | 'sectionB', itemId: number) => {
+    if (!data || !checklist) return;
+    const newData = {
+      ...data,
+      [section]: data[section].filter((i: any) => i.id !== itemId)
+    };
+    setData(newData);
+    try {
+      await checklistApi.updateItems(checklist.id, newData, section);
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  const handleEditItemLabel = async (section: 'sectionA' | 'sectionB', itemId: number, newLabel: string) => {
+    if (!data || !checklist || !newLabel.trim()) return;
+    const newData = {
+      ...data,
+      [section]: data[section].map((i: any) => i.id === itemId ? { ...i, label: newLabel } : i)
+    };
+    setData(newData);
+    try {
+      await checklistApi.updateItems(checklist.id, newData, section);
+    } catch (err: any) {
+      console.error(err);
     }
   };
 
@@ -329,6 +367,9 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
             section="sectionA"
             disabled={checklist?.status !== 'IN_PROGRESS'}
             onValueChange={handleValueChange}
+            onAddItem={handleAddItem}
+            onRemoveItem={handleRemoveItem}
+            onEditItemLabel={handleEditItemLabel}
           />
 
           {/* Section B */}
@@ -338,6 +379,9 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
             section="sectionB"
             disabled={checklist?.status !== 'IN_PROGRESS'}
             onValueChange={handleValueChange}
+            onAddItem={handleAddItem}
+            onRemoveItem={handleRemoveItem}
+            onEditItemLabel={handleEditItemLabel}
           />
         </>
       )}
@@ -409,11 +453,33 @@ interface ChecklistSectionProps {
   section: 'sectionA' | 'sectionB';
   disabled: boolean;
   onValueChange: (section: 'sectionA' | 'sectionB', id: number, value: CheckValue | null) => void;
+  onAddItem: (section: 'sectionA' | 'sectionB', label: string) => void;
+  onRemoveItem: (section: 'sectionA' | 'sectionB', id: number) => void;
+  onEditItemLabel: (section: 'sectionA' | 'sectionB', id: number, label: string) => void;
 }
 
-const ChecklistSection: React.FC<ChecklistSectionProps> = ({ title, items, section, disabled, onValueChange }) => {
+const ChecklistSection: React.FC<ChecklistSectionProps> = ({ title, items, section, disabled, onValueChange, onAddItem, onRemoveItem, onEditItemLabel }) => {
+  const [newItemLabel, setNewItemLabel] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+
   const completed = items.filter(i => i.value !== null).length;
   const total = items.length;
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newItemLabel.trim()) {
+      onAddItem(section, newItemLabel);
+      setNewItemLabel('');
+    }
+  };
+
+  const submitEdit = (id: number) => {
+    if (editLabel.trim()) {
+      onEditItemLabel(section, id, editLabel);
+    }
+    setEditingId(null);
+  };
 
   return (
     <div style={{
@@ -436,7 +502,7 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({ title, items, secti
 
       {/* Column headers */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '2rem 1fr 4rem 4rem 4rem',
+        display: 'grid', gridTemplateColumns: '2rem 1fr 4rem 4rem 4rem 2rem',
         padding: '0.5rem 1.25rem', gap: '0.5rem',
         background: 'rgba(255,255,255,0.02)',
         borderBottom: '1px solid var(--border-color)',
@@ -447,19 +513,52 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({ title, items, secti
         <span style={{ textAlign: 'center' }}>OK</span>
         <span style={{ textAlign: 'center' }}>PTE</span>
         <span style={{ textAlign: 'center' }}>N/A</span>
+        <span></span>
       </div>
 
       {/* Items */}
       {items.map((item, idx) => (
         <div key={item.id} style={{
-          display: 'grid', gridTemplateColumns: '2rem 1fr 4rem 4rem 4rem',
+          display: 'grid', gridTemplateColumns: '2rem 1fr 4rem 4rem 4rem 2rem',
           padding: '0.6rem 1.25rem', gap: '0.5rem', alignItems: 'center',
           borderBottom: idx < items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
           background: item.value ? `${VALUE_STYLES[item.value as CheckValue]?.bg}33` : 'transparent',
           transition: 'background 0.15s'
         }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>{item.id}</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '0.88rem' }}>{item.label}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>{idx + 1}</span>
+          
+          {editingId === item.id ? (
+            <input
+              type="text"
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              onBlur={() => submitEdit(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitEdit(item.id);
+                if (e.key === 'Escape') setEditingId(null);
+              }}
+              autoFocus
+              style={{
+                background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)',
+                color: 'var(--text-main)', fontSize: '0.88rem', padding: '0.2rem 0.5rem',
+                borderRadius: '4px', width: '100%', outline: 'none'
+              }}
+            />
+          ) : (
+            <span 
+              style={{ color: 'var(--text-main)', fontSize: '0.88rem', cursor: disabled ? 'default' : 'text' }}
+              onClick={() => {
+                if (!disabled) {
+                  setEditingId(item.id);
+                  setEditLabel(item.label);
+                }
+              }}
+              title={disabled ? '' : 'Clic para editar'}
+            >
+              {item.label}
+            </span>
+          )}
+
           {VALUE_OPTIONS.map(opt => {
             const selected = item.value === opt;
             const st = VALUE_STYLES[opt];
@@ -482,8 +581,59 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({ title, items, secti
               </div>
             );
           })}
+          
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            {!disabled && (
+              <button
+                onClick={() => onRemoveItem(section, item.id)}
+                title="Eliminar elemento"
+                style={{
+                  background: 'none', border: 'none', color: '#ef4444',
+                  cursor: 'pointer', opacity: 0.7, padding: '0.2rem'
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.7'}
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
         </div>
       ))}
+
+      {/* Add New Item */}
+      {!disabled && (
+        <form onSubmit={handleAddSubmit} style={{
+          display: 'flex', gap: '0.5rem', padding: '0.75rem 1.25rem',
+          borderTop: '1px solid var(--border-color)',
+          background: 'rgba(255,255,255,0.01)'
+        }}>
+          <input
+            type="text"
+            placeholder="Nuevo elemento..."
+            value={newItemLabel}
+            onChange={(e) => setNewItemLabel(e.target.value)}
+            style={{
+              flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.85rem',
+              background: 'var(--bg-main)', border: '1px solid var(--border-color)',
+              borderRadius: '6px', color: 'var(--text-main)', outline: 'none'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!newItemLabel.trim()}
+            style={{
+              padding: '0.5rem 1rem', background: 'rgba(16,185,129,0.15)',
+              border: '1px solid rgba(16,185,129,0.4)', borderRadius: '6px',
+              color: '#34d399', cursor: newItemLabel.trim() ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600,
+              fontSize: '0.85rem', opacity: newItemLabel.trim() ? 1 : 0.5
+            }}
+          >
+            <Plus size={14} /> Agregar
+          </button>
+        </form>
+      )}
     </div>
   );
 };
