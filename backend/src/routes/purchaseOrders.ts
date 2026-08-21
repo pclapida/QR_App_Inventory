@@ -46,6 +46,14 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Helper: get the current EUR exchange rate from DB (falls back to 21.50)
+async function getEurRate(): Promise<number> {
+  try {
+    const cfg = await prisma.systemConfig.findUnique({ where: { key: 'EUR_RATE' } });
+    return cfg ? parseFloat(cfg.value) : 21.50;
+  } catch { return 21.50; }
+}
+
 // POST /api/purchase-orders - Create new requisition
 router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -54,6 +62,8 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
       reqNumber,
       itemName,
       category,
+      purchaseType,
+      capexCodeId,
       quantity,
       unitPrice,
       supplier,
@@ -65,6 +75,20 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
       return res.status(400).json({ error: 'Artículo, Cantidad y Proveedor son obligatorios.' });
     }
 
+    const type = (purchaseType === 'CAPEX') ? 'CAPEX' : 'OPEX';
+
+    // CAPEX requires a code
+    if (type === 'CAPEX' && !capexCodeId) {
+      return res.status(400).json({ error: 'Para requisiciones CAPEX, el Código de Inversión es obligatorio.' });
+    }
+
+    // Validate the CAPEX code exists
+    if (type === 'CAPEX' && capexCodeId) {
+      const capexCode = await prisma.capexCode.findUnique({ where: { id: capexCodeId } });
+      if (!capexCode) return res.status(404).json({ error: 'Código CAPEX no encontrado.' });
+      if (!capexCode.isActive) return res.status(400).json({ error: 'El código CAPEX seleccionado está inactivo.' });
+    }
+
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
       return res.status(400).json({ error: 'La cantidad debe ser un número entero mayor a 0.' });
@@ -74,9 +98,11 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
     const total = qty * price;
     const year = new Date().getFullYear();
     const randomPart = uuidv4().split('-')[0].toUpperCase();
-    
-    // Auto-generate Requisition Folio if not provided
     const finalReqNumber = reqNumber && reqNumber.trim() ? reqNumber.trim() : `REQ-${year}-${randomPart}`;
+
+    // Calculate EUR equivalent using configured rate
+    const eurRate = await getEurRate();
+    const amountEUR = eurRate > 0 ? parseFloat((total / eurRate).toFixed(4)) : null;
 
     const order = await prisma.purchaseOrder.create({
       data: {
@@ -87,12 +113,16 @@ router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response) 
         supplier: supplier.trim(),
         itemName: itemName.trim(),
         category: category || 'Equipos & Dispositivos',
+        purchaseType: type,
+        capexCodeId: type === 'CAPEX' ? capexCodeId : null,
         quantity: qty,
         unitPrice: price,
         totalPrice: total,
+        amountEUR,
         status: 'PENDING',
         notes: notes ? notes.trim() : null
-      }
+      },
+      include: { capexCode: true }
     });
 
     return res.status(201).json({ order });
@@ -282,6 +312,16 @@ router.put('/:id/status', requireAdmin, async (req: AuthenticatedRequest, res: R
             }
           });
         }
+
+        // ── CAPEX Budget Deduction ─────────────────────────────────────────────
+        // If this requisition is CAPEX and has a linked code, deduct amountEUR from the code's consumedEUR
+        if (order.purchaseType === 'CAPEX' && order.capexCodeId && order.amountEUR) {
+          await tx.capexCode.update({
+            where: { id: order.capexCodeId },
+            data: { consumedEUR: { increment: order.amountEUR } }
+          });
+        }
+        // ──────────────────────────────────────────────────────────────────────
       }
 
       return updatedOrder;

@@ -11,6 +11,8 @@ import purchaseOrderRoutes from './routes/purchaseOrders';
 import responsivaRoutes from './routes/responsiva';
 import loanRoutes from './routes/loans';
 import checklistRoutes from './routes/checklists';
+import capexRoutes from './routes/capex';
+import systemConfigRoutes from './routes/systemConfig';
 
 dotenv.config();
 
@@ -73,6 +75,8 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/responsivas', responsivaRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/checklists', checklistRoutes);
+app.use('/api/capex', capexRoutes);
+app.use('/api/system-config', systemConfigRoutes);
 
 // Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
