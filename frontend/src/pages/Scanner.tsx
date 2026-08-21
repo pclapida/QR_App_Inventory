@@ -267,7 +267,7 @@ export const Scanner: React.FC = () => {
     else if (lower.includes('laptop')) devType = 'Laptop';
     else if (lower.includes('tablet')) devType = 'Tablet';
     else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
-    else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';
+    else if (lower.includes('pc') || lower.includes('cpu') || lower.includes('minipc') || lower.includes('computadora') || lower.includes('desktop')) devType = 'PC';
     else if (lower.includes('zebra')) devType = 'Zebra';
     else if (lower.includes('impresora') || lower.includes('printer')) devType = 'Impresoras';
 
@@ -298,7 +298,7 @@ export const Scanner: React.FC = () => {
     else if (lower.includes('laptop')) devType = 'Laptop';
     else if (lower.includes('tablet')) devType = 'Tablet';
     else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
-    else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';
+    else if (lower.includes('pc') || lower.includes('cpu') || lower.includes('minipc') || lower.includes('computadora') || lower.includes('desktop')) devType = 'PC';
     else if (lower.includes('zebra')) devType = 'Zebra';
     else if (lower.includes('impresora') || lower.includes('printer')) devType = 'Impresoras';
 

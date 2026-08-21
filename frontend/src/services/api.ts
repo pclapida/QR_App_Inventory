@@ -15,7 +15,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 /**
  * Determina si un equipo requiere Checklist técnico pre-asignación obligatorio.
- * REGLA ESTRICTA: Solo requerido para Laptop, PC / Computadora de Escritorio, MiniPC, Tablet y Paneles.
+ * REGLA ESTRICTA: Solo requerido para Laptop, PC / CPU / Computadora de Escritorio, MiniPC, Tablet y Paneles.
  * NUNCA para: USBs, Mouses, Teclados, Monitores, Impresoras, Lectores, Consumibles, etc.
  */
 export const isDeviceRequiringChecklist = (item: { category?: string | null; name?: string | null; model?: string | null } | null | undefined): boolean => {
@@ -46,7 +46,7 @@ export const isDeviceRequiringChecklist = (item: { category?: string | null; nam
   );
 
   if (isPeripheralOrAccessory) {
-    const isExplicitComputer = /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|tablet|ipad|minipc|mini[- ]pc|desktop|optiplex|thinkcentre|workstation|panel industrial)\b/i.test(
+    const isExplicitComputer = /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|cpu|cpus|tablet|ipad|minipc|mini[- ]pc|desktop|optiplex|thinkcentre|workstation|panel industrial)\b/i.test(
       name
     );
     if (!isExplicitComputer) {
@@ -67,7 +67,7 @@ export const isDeviceRequiringChecklist = (item: { category?: string | null; nam
   }
 
   // 3. Verificación de palabras clave
-  return /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|pc|desktop|computadora|minipc|mini[- ]pc|optiplex|thinkcentre|workstation|tablet|ipad|galaxy tab|panel|paneles)\b/i.test(
+  return /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|cpu|cpus|pc|desktop|computadora|minipc|mini[- ]pc|optiplex|thinkcentre|workstation|tablet|ipad|galaxy tab|panel|paneles)\b/i.test(
     combined
   );
 };
