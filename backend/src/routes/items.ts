@@ -247,11 +247,10 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
       whereClause.status = 'ACTIVE';
       whereClause.faults = { not: null };
     } else if (tab === 'TRANSFERS') {
-      whereClause.status = 'ACTIVE';
-      whereClause.OR = [
-        { plant: 'Planta UPCAST' },
-        { originPlant: { not: null } }
-      ];
+      const transferItemIds = await prisma.$queryRaw<{id: string}[]>`
+        SELECT id FROM "Item" WHERE status = 'ACTIVE' AND "originPlant" IS NOT NULL AND "originPlant" != plant
+      `;
+      whereClause.id = { in: transferItemIds.map(r => r.id) };
     } else {
       if (status && typeof status === 'string' && status.trim() !== '') {
         if (status.toUpperCase() !== 'ALL') {
@@ -846,11 +845,15 @@ router.post('/:id/transfer', requireAdmin, async (req: AuthenticatedRequest, res
       return res.status(400).json({ error: `El artículo ya se encuentra en ${newPlant}` });
     }
 
+    const originalOrigin = existing.originPlant || fromPlant;
+    const finalOrigin = newPlant === originalOrigin ? null : originalOrigin;
+
     const updatedItem = await prisma.item.update({
       where: { id },
       data: {
         plant: newPlant,
-        location: existing.area ? `${existing.area} (${newPlant})` : newPlant
+        originPlant: finalOrigin,
+        location: existing.area ? `${existing.area} (${newPlant})` : `Almacén IT (${newPlant})`
       }
     });
 

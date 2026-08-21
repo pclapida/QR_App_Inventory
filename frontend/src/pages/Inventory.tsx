@@ -619,7 +619,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {activeTab === 'AVAILABLE' && <><Laptop style={{ color: 'var(--coficab-copper)' }} /> Inventario Disponible (Almacén IT)</>}
             {activeTab === 'LOANS' && <><ArrowRightLeft style={{ color: '#6366f1' }} /> Préstamos Temporales de IT</>}
             {activeTab === 'SCRAP' && <><Trash2 style={{ color: '#f43f5e' }} /> Bajas de Activos & Scrap</>}
-            {activeTab === 'TRANSFERS' && <><Truck style={{ color: '#0ea5e9' }} /> Transferencias de Planta (Planta 2 / UPCAST)</>}
+            {activeTab === 'TRANSFERS' && <><Truck style={{ color: '#0ea5e9' }} /> Transferencias entre Plantas</>}
             {activeTab === 'DAMAGED' && <><AlertTriangle style={{ color: '#f59e0b' }} /> Equipos Dañados & Con Fallas</>}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '0.2rem' }}>
@@ -627,7 +627,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
             {activeTab === 'AVAILABLE' && 'Equipos en stock del taller de IT listos para ser asignados con responsiva o prestados.'}
             {activeTab === 'LOANS' && 'Control de préstamos temporales de laptops, proyectores y accesorios con fecha de devolución.'}
             {activeTab === 'SCRAP' && 'Histórico de equipos desincorporados por daño, obsolescencia o disposición E-Waste.'}
-            {activeTab === 'TRANSFERS' && 'Equipos ubicados físicamente en Planta 2 o Planta UPCAST con trazabilidad de origen.'}
+            {activeTab === 'TRANSFERS' && 'Equipos trasladados físicamente entre plantas (Planta 1, Planta 2, Planta 3, UPCAST) con trazabilidad de planta de origen.'}
             {activeTab === 'DAMAGED' && 'Equipos reportados con fallas técnicas o daños físicos en espera de reparación o dictamen técnico.'}
           </p>
         </div>
