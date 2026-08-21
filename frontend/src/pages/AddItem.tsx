@@ -215,7 +215,9 @@ export const AddItem: React.FC = () => {
               onChange={(e) => setPlant(e.target.value)}
               style={{ fontSize: '1.05rem', fontWeight: 700, borderColor: 'var(--primary)' }}
             >
+              <option value="Planta 1">Planta 1</option>
               <option value="Planta 2">Planta 2 (Planta Principal)</option>
+              <option value="Planta 3">Planta 3</option>
               <option value="Planta UPCAST">Planta UPCAST</option>
             </select>
           </div>

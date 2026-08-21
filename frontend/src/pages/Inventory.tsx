@@ -813,7 +813,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           )}
         </div>
 
-        {/* Planta Filter (Only Planta 2 and Planta UPCAST) */}
+        {/* Planta Filter (All plants available) */}
         {activeTab !== 'LOANS' && (
           <div style={{ width: '180px' }}>
             <select
@@ -823,7 +823,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               style={{ fontSize: '0.85rem' }}
             >
               <option value="">Todas las Plantas</option>
+              <option value="Planta 1">Planta 1</option>
               <option value="Planta 2">Planta 2 (Principal)</option>
+              <option value="Planta 3">Planta 3</option>
               <option value="Planta UPCAST">Planta UPCAST</option>
             </select>
           </div>
@@ -1161,7 +1163,9 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
                   onChange={(e) => setTargetPlant(e.target.value)}
                   required
                 >
+                  <option value="Planta 1">Planta 1</option>
                   <option value="Planta 2">Planta 2 (Principal)</option>
+                  <option value="Planta 3">Planta 3</option>
                   <option value="Planta UPCAST">Planta UPCAST</option>
                 </select>
               </div>
