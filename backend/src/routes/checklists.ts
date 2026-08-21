@@ -97,15 +97,17 @@ router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(400).json({ error: 'La estructura de secciones es requerida' });
     }
 
-    // Format clean template sections (only id and label)
+    // Format clean template sections preserving marked values (OK, PTE, N/A, null)
     const cleanSections = {
       sectionA: (sections.sectionA || []).map((item: any) => ({
         id: item.id || Date.now(),
-        label: item.label
+        label: item.label,
+        value: item.value || null
       })),
       sectionB: (sections.sectionB || []).map((item: any) => ({
         id: item.id || Date.now(),
-        label: item.label
+        label: item.label,
+        value: item.value || null
       }))
     };
 
@@ -139,7 +141,7 @@ router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
 
     return res.status(201).json({
       template,
-      message: `Plantilla "${template.name}" guardada exitosamente`
+      message: `Plantilla "${template.name}" guardada exitosamente con sus estados marcados`
     });
   } catch (err: any) {
     console.error('Error saving template:', err);
@@ -189,7 +191,7 @@ router.post('/:id/apply-template', async (req: AuthenticatedRequest, res: Respon
       return res.status(400).json({ error: 'Solo se puede aplicar plantilla a un checklist en progreso' });
     }
 
-    let templateSections = CHECKLIST_TEMPLATE;
+    let templateSections: any = CHECKLIST_TEMPLATE;
     if (templateId && templateId !== 'default') {
       const template = await prisma.checklistTemplate.findUnique({
         where: { id: templateId }
@@ -201,14 +203,14 @@ router.post('/:id/apply-template', async (req: AuthenticatedRequest, res: Respon
 
     const newData = {
       sectionA: (templateSections.sectionA || []).map((item: any) => ({
-        id: item.id,
+        id: item.id || Date.now(),
         label: item.label,
-        value: null
+        value: item.value !== undefined ? item.value : null
       })),
       sectionB: (templateSections.sectionB || []).map((item: any) => ({
-        id: item.id,
+        id: item.id || Date.now(),
         label: item.label,
-        value: null
+        value: item.value !== undefined ? item.value : null
       }))
     };
 
