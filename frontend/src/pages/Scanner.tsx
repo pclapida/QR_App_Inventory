@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api, { Item, Transaction } from '../services/api';
+import api, { Item, Transaction, isDeviceRequiringChecklist } from '../services/api';
 import { HardwareScanner } from '../components/HardwareScanner';
 import { QRCameraScanner } from '../components/QRCameraScanner';
 import { QRModal } from '../components/QRModal';
@@ -699,10 +699,16 @@ export const Scanner: React.FC = () => {
               {scannedItem.status === 'ACTIVE' && !scannedItem.faults && scannedItem.isITInternal && !scannedItem.assignedTo && isAdmin && (
                 <button
                   className="btn btn-primary"
-                  onClick={() => setShowChecklistModal(true)}
+                  onClick={() => {
+                    if (isDeviceRequiringChecklist(scannedItem)) {
+                      setShowChecklistModal(true);
+                    } else {
+                      setShowResponsivaModal(true);
+                    }
+                  }}
                   style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', fontSize: '0.9rem', fontWeight: 800 }}
                 >
-                  <FileText size={16} /> Asignar Equipo (Checklist + Responsiva)
+                  <FileText size={16} /> Asignar Equipo {isDeviceRequiringChecklist(scannedItem) ? '(Checklist + Responsiva)' : '(Responsiva)'}
                 </button>
               )}
 
@@ -1146,7 +1152,7 @@ export const Scanner: React.FC = () => {
           itemSku={scannedItem.sku}
           onCompleted={() => {
             setShowChecklistModal(false);
-            setShowDeliveryModal(true); // Proceed to delivery/responsiva
+            setShowResponsivaModal(true); // Proceed to responsiva modal
           }}
         />
       )}

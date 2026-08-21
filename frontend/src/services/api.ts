@@ -13,6 +13,41 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   USER: 'Usuario',
 };
 
+/**
+ * Determina si un equipo requiere Checklist técnico pre-asignación obligatorio.
+ * Solo requerido para: Laptop, PC, MiniPC y Tablet.
+ */
+export const isDeviceRequiringChecklist = (item: { category?: string | null; name?: string | null; model?: string | null } | null | undefined): boolean => {
+  if (!item) return false;
+  const cat = (item.category || '').toLowerCase().trim();
+  const name = (item.name || '').toLowerCase().trim();
+  const model = (item.model || '').toLowerCase().trim();
+  const combined = `${cat} ${name} ${model}`;
+
+  if (
+    cat === 'laptops' ||
+    cat === 'tablets' ||
+    cat.includes('mini pc') ||
+    cat.includes('desktop')
+  ) {
+    return true;
+  }
+
+  return (
+    combined.includes('laptop') ||
+    combined.includes('notebook') ||
+    combined.includes('tablet') ||
+    combined.includes('ipad') ||
+    combined.includes('minipc') ||
+    combined.includes('mini pc') ||
+    combined.includes('mini-pc') ||
+    combined.includes('pc ') ||
+    combined.startsWith('pc') ||
+    combined.includes('computadora') ||
+    combined.includes('desktop')
+  );
+};
+
 export interface User {
   id: string;
   email: string;

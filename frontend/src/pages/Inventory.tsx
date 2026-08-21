@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api, { Item, itemsApi, DeviceLoan, loansApi } from '../services/api';
+import api, { Item, itemsApi, DeviceLoan, loansApi, isDeviceRequiringChecklist } from '../services/api';
 import { QRModal } from '../components/QRModal';
 import { ItemEditModal, ItemEditFormData } from '../components/inventory/ItemEditModal';
 import { ItemDetailModal } from '../components/inventory/ItemDetailModal';
@@ -966,7 +966,13 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               selection={{ selectedItemIds, setSelectedItemIds }}
               actions={{
                 onViewItem: setViewingItem,
-                onAssign: setChecklistPendingItem,
+                onAssign: (item: Item) => {
+                  if (isDeviceRequiringChecklist(item)) {
+                    setChecklistPendingItem(item);
+                  } else {
+                    setAssigningItem(item);
+                  }
+                },
                 onUnassign: handleUnassignItem,
                 onReportFault: setFaultReportItem,
                 onRepair: handleRepairItem,
