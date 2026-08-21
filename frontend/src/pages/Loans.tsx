@@ -20,8 +20,9 @@ import { DeviceLoan, loansApi, Item, itemsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export const Loans: React.FC = () => {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { user, canEdit, canDelete, isSuperAdmin } = useAuth();
+  const isAdmin = canEdit; // SUPERADMIN | ADMIN_PLANTA | OPERATOR | ADMIN
+  const isSuper = canDelete; // SUPERADMIN | ADMIN_PLANTA | ADMIN
 
   const [loans, setLoans] = useState<DeviceLoan[]>([]);
   const [items, setItems] = useState<Item[]>([]);

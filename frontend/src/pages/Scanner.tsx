@@ -36,7 +36,10 @@ import {
   Edit,
   X,
   CheckSquare,
-  ShieldCheck
+  ShieldCheck,
+  Undo2,
+  RotateCcw,
+  Truck
 } from 'lucide-react';
 
 const MAINTENANCE_MATRIX: { [key: string]: { frequency: string; days: number; tasks: string[] } } = {
@@ -74,8 +77,11 @@ const MAINTENANCE_MATRIX: { [key: string]: { frequency: string; days: number; ta
 
 export const Scanner: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { user, canEdit, canDelete, isSuperAdmin: isSA, isOperator: isOp } = useAuth();
+  // Role helpers — consistent with Inventory.tsx
+  const isAdmin = canEdit;   // SUPERADMIN | ADMIN_PLANTA | OPERATOR | ADMIN
+  const isSuper = canDelete; // SUPERADMIN | ADMIN_PLANTA | ADMIN
+  const isOperatorOnly = isOp && !canDelete; // pure OPERATOR, not an admin
   const [searchParams] = useSearchParams();
 
   const [scanMode, setScanMode] = useState<'hardware' | 'camera'>('hardware');
@@ -107,6 +113,27 @@ export const Scanner: React.FC = () => {
   const [maintAvailableTasks, setMaintAvailableTasks] = useState<string[]>([]);
   const [maintSelectedTasks, setMaintSelectedTasks] = useState<string[]>([]);
   const [maintSubmitting, setMaintSubmitting] = useState<boolean>(false);
+
+  // NEW: Unassign / Return modal
+  const [showUnassignModal, setShowUnassignModal] = useState<boolean>(false);
+  const [unassignNotes, setUnassignNotes] = useState<string>('');
+  const [unassignSubmitting, setUnassignSubmitting] = useState<boolean>(false);
+
+  // NEW: Report Fault modal
+  const [showFaultModal, setShowFaultModal] = useState<boolean>(false);
+  const [faultText, setFaultText] = useState<string>('');
+  const [faultSubmitting, setFaultSubmitting] = useState<boolean>(false);
+
+  // NEW: Repair modal
+  const [showRepairModal, setShowRepairModal] = useState<boolean>(false);
+  const [repairNotes, setRepairNotes] = useState<string>('');
+  const [repairSubmitting, setRepairSubmitting] = useState<boolean>(false);
+
+  // NEW: Decommission inline modal
+  const [showDecommissionModal, setShowDecommissionModal] = useState<boolean>(false);
+  const [decommReason, setDecommReason] = useState<string>('');
+  const [decommNotes, setDecommNotes] = useState<string>('');
+  const [decommSubmitting, setDecommSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     const codeParam = searchParams.get('code');
@@ -301,6 +328,89 @@ export const Scanner: React.FC = () => {
     setError(null);
     setSuccessMessage(null);
     setAssignedTo('');
+  };
+
+  // --- NEW HANDLERS ---
+
+  const handleUnassign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannedItem) return;
+    setUnassignSubmitting(true);
+    setError(null);
+    try {
+      await api.post(`/items/${scannedItem.id}/unassign`, { notes: unassignNotes });
+      setSuccessMessage(`✅ Equipo "${scannedItem.name}" devuelto al almacén IT correctamente.`);
+      setShowUnassignModal(false);
+      setUnassignNotes('');
+      const refreshRes = await api.get(`/items/scan/${encodeURIComponent(scannedItem.qrCodePayload)}`);
+      setScannedItem(refreshRes.data.item);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al devolver el equipo.');
+    } finally {
+      setUnassignSubmitting(false);
+    }
+  };
+
+  const handleReportFault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannedItem || !faultText.trim()) return;
+    setFaultSubmitting(true);
+    setError(null);
+    try {
+      await api.put(`/items/${scannedItem.id}`, { faults: faultText.trim() });
+      setSuccessMessage(`⚠️ Falla reportada para "${scannedItem.name}". El equipo queda marcado como dañado.`);
+      setShowFaultModal(false);
+      setFaultText('');
+      const refreshRes = await api.get(`/items/scan/${encodeURIComponent(scannedItem.qrCodePayload)}`);
+      setScannedItem(refreshRes.data.item);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al reportar la falla.');
+    } finally {
+      setFaultSubmitting(false);
+    }
+  };
+
+  const handleRepair = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannedItem) return;
+    setRepairSubmitting(true);
+    setError(null);
+    try {
+      await api.put(`/items/${scannedItem.id}`, { faults: null, notes: repairNotes ? `[Reparado] ${repairNotes}` : undefined });
+      setSuccessMessage(`✅ Equipo "${scannedItem.name}" marcado como reparado. Regresa al inventario disponible.`);
+      setShowRepairModal(false);
+      setRepairNotes('');
+      const refreshRes = await api.get(`/items/scan/${encodeURIComponent(scannedItem.qrCodePayload)}`);
+      setScannedItem(refreshRes.data.item);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al marcar como reparado.');
+    } finally {
+      setRepairSubmitting(false);
+    }
+  };
+
+  const handleDecommission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scannedItem || !decommReason.trim()) return;
+    setDecommSubmitting(true);
+    setError(null);
+    try {
+      await api.post(`/items/${scannedItem.id}/decommission`, {
+        reason: decommReason.trim(),
+        notes: decommNotes.trim(),
+        decommissionedBy: user?.name || user?.username
+      });
+      setSuccessMessage(`🗑️ Equipo "${scannedItem.name}" dado de baja exitosamente.`);
+      setShowDecommissionModal(false);
+      setDecommReason('');
+      setDecommNotes('');
+      const refreshRes = await api.get(`/items/scan/${encodeURIComponent(scannedItem.qrCodePayload)}`);
+      setScannedItem(refreshRes.data.item);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al dar de baja el equipo.');
+    } finally {
+      setDecommSubmitting(false);
+    }
   };
 
   const isAssetCategory = scannedItem && (
@@ -560,61 +670,154 @@ export const Scanner: React.FC = () => {
               </p>
             </div>
 
-            {/* Quick Action Toolbar */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* ── CONTEXTUAL ACTION PANEL ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 'min(100%, 320px)' }}>
+
+              {/* ─── Status label ─── */}
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.1rem' }}>
+                Estado del Equipo
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                {scannedItem.status === 'DECOMMISSIONED' && (
+                  <span className="badge" style={{ background: 'rgba(244,63,94,0.2)', color: '#f43f5e', border: '1px solid #f43f5e', fontWeight: 800 }}>🗑️ Baja / Scrap</span>
+                )}
+                {scannedItem.status === 'ACTIVE' && scannedItem.faults && (
+                  <span className="badge" style={{ background: 'rgba(245,158,11,0.2)', color: '#f59e0b', border: '1px solid #f59e0b', fontWeight: 800 }}>⚠️ Con Falla</span>
+                )}
+                {scannedItem.status === 'ACTIVE' && !scannedItem.faults && scannedItem.assignedTo && (
+                  <span className="badge" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid #6366f1', fontWeight: 800 }}>👤 Asignado: {scannedItem.assignedTo}</span>
+                )}
+                {scannedItem.status === 'ACTIVE' && !scannedItem.faults && !scannedItem.assignedTo && scannedItem.isITInternal && (
+                  <span className="badge" style={{ background: 'rgba(16,185,129,0.2)', color: '#10b981', border: '1px solid #10b981', fontWeight: 800 }}>✅ Disponible (Almacén IT)</span>
+                )}
+                {scannedItem.status === 'ACTIVE' && !scannedItem.faults && !scannedItem.assignedTo && !scannedItem.isITInternal && (
+                  <span className="badge" style={{ background: 'rgba(99,102,241,0.15)', color: '#a78bfa', border: '1px solid #7c3aed', fontWeight: 800 }}>📋 En Uso (Sin Responsiva)</span>
+                )}
+              </div>
+
+              {/* ─── 1. ASIGNAR — Disponible + Admin ─── */}
+              {scannedItem.status === 'ACTIVE' && !scannedItem.faults && scannedItem.isITInternal && !scannedItem.assignedTo && isAdmin && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowChecklistModal(true)}
+                  style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <FileText size={16} /> Asignar Equipo (Checklist + Responsiva)
+                </button>
+              )}
+
+              {/* ─── 2. DEVOLVER — Asignado + Admin/Operator ─── */}
+              {scannedItem.status === 'ACTIVE' && scannedItem.assignedTo && isAdmin && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowUnassignModal(true)}
+                  style={{ borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <Undo2 size={16} /> Devolver al Almacén IT
+                </button>
+              )}
+
+              {/* ─── 3. MARCAR REPARADO — Con falla + Admin ─── */}
+              {scannedItem.status === 'ACTIVE' && scannedItem.faults && isAdmin && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowRepairModal(true)}
+                  style={{ borderColor: '#10b981', color: '#10b981', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <CheckSquare size={16} /> Marcar como Reparado
+                </button>
+              )}
+
+              {/* ─── 4. REPORTAR FALLA — Activo + Admin/Operator ─── */}
+              {scannedItem.status === 'ACTIVE' && !scannedItem.faults && isAdmin && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowFaultModal(true)}
+                  style={{ borderColor: '#f59e0b', color: '#f59e0b', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <AlertTriangle size={16} /> Reportar Falla / Daño
+                </button>
+              )}
+
+              {/* ─── 5. TRASLADO DE PLANTA — Activo + Admin ─── */}
+              {scannedItem.status !== 'DECOMMISSIONED' && isAdmin && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const plants = ['Planta 1', 'Planta 2', 'Planta 3', 'Planta UPCAST'];
+                    const otherPlants = plants.filter(p => p !== scannedItem.plant);
+                    setTargetPlant(otherPlants[0]);
+                    setShowTransferModal(true);
+                  }}
+                  style={{ borderColor: '#0ea5e9', color: '#0ea5e9', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <Truck size={16} /> Trasladar de Planta
+                </button>
+              )}
+
+              {/* ─── 6. REACTIVAR — Scrap + Super ─── */}
+              {scannedItem.status === 'DECOMMISSIONED' && isSuper && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={async () => {
+                    if (!window.confirm(`¿Reactivar "${scannedItem.name}" al inventario disponible?`)) return;
+                    try {
+                      await api.post(`/items/${scannedItem.id}/reactivate`);
+                      setSuccessMessage(`♻️ "${scannedItem.name}" reactivado correctamente.`);
+                      const r = await api.get(`/items/scan/${encodeURIComponent(scannedItem.qrCodePayload)}`);
+                      setScannedItem(r.data.item);
+                    } catch (e: any) {
+                      setError(e.response?.data?.error || 'Error al reactivar.');
+                    }
+                  }}
+                  style={{ borderColor: '#10b981', color: '#10b981', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <RotateCcw size={16} /> Reactivar al Inventario
+                </button>
+              )}
+
+              {/* ─── 7. DAR DE BAJA — Activo + Super ─── */}
+              {scannedItem.status === 'ACTIVE' && isSuper && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowDecommissionModal(true)}
+                  style={{ borderColor: '#f43f5e', color: '#f43f5e', fontSize: '0.9rem', fontWeight: 800 }}
+                >
+                  <Trash2 size={16} /> Dar de Baja / Scrap
+                </button>
+              )}
+
+              {/* ─── Separator ─── */}
+              <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.25rem 0' }} />
+
+              {/* ─── 8. MANTENIMIENTO — Siempre ─── */}
               <button
                 className="btn btn-primary"
                 onClick={handleOpenMaintenanceModal}
                 style={{
-                  background: maintCountdown?.isOverdue ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #d97706 0%, #b07238 100%)',
+                  background: maintCountdown?.isOverdue
+                    ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                    : 'linear-gradient(135deg, #d97706 0%, #b07238 100%)',
                   fontSize: '0.85rem'
                 }}
               >
-                <Wrench size={16} />
-                {maintCountdown?.text}
+                <Wrench size={16} /> {maintCountdown?.text}
               </button>
 
-              {isAdmin && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setTargetPlant(scannedItem.plant === 'Planta 2' ? 'Planta 3' : 'Planta 2');
-                    setShowTransferModal(true);
-                  }}
-                  style={{ fontSize: '0.85rem', borderColor: 'var(--coficab-copper)', color: 'var(--coficab-copper)', fontWeight: 700 }}
-                >
-                  <RefreshCw size={16} />
-                  Mover de Planta
+              {/* ─── 9. Utilidades ─── */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-secondary" onClick={() => setShowQRModal(true)} style={{ fontSize: '0.82rem', flex: 1 }}>
+                  <QrCode size={15} /> Ver QR
                 </button>
-              )}
-
-              <button className="btn btn-secondary" onClick={() => setShowQRModal(true)} style={{ fontSize: '0.85rem' }}>
-                <QrCode size={16} />
-                Ver QR
-              </button>
-
-              <button className="btn btn-secondary" onClick={() => setShowTimelineModal(true)} style={{ fontSize: '0.85rem', color: 'var(--coficab-blue-bright)', borderColor: 'var(--coficab-blue-bright)' }}>
-                <Clock size={16} />
-                Línea de Tiempo
-              </button>
-
-              {/* Entregar Equipo — solo para equipos de IT */}
-              {scannedItem.isITInternal && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setShowChecklistModal(true)}
-                  style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                  title="Checklist y Responsiva Digital"
-                >
-                  <FileText size={16} />
-                  Entregar Equipo
+                <button className="btn btn-secondary" onClick={() => setShowTimelineModal(true)} style={{ fontSize: '0.82rem', flex: 1, color: 'var(--coficab-blue-bright)', borderColor: 'var(--coficab-blue-bright)' }}>
+                  <Clock size={15} /> Historial
                 </button>
-              )}
-
-              <button className="btn btn-danger" onClick={handleDeleteScannedItem} style={{ fontSize: '0.85rem' }}>
-                <Trash2 size={16} />
-                Eliminar
-              </button>
+                {isAdmin && scannedItem.status !== 'DECOMMISSIONED' && (
+                  <button className="btn btn-secondary" onClick={() => navigate(`/inventory?edit=${scannedItem.id}`)} style={{ fontSize: '0.82rem', flex: 1 }}>
+                    <Edit size={15} /> Editar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1149,6 +1352,146 @@ export const Scanner: React.FC = () => {
           item={scannedItem}
         />
       )}
+
+      {/* ─── MODAL: DEVOLVER / UNASSIGN ─── */}
+      {showUnassignModal && scannedItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Undo2 size={24} style={{ color: 'var(--coficab-copper)' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>Devolver Equipo al Almacén IT</h3>
+              </div>
+              <button onClick={() => setShowUnassignModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={22} /></button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              El equipo <strong style={{ color: 'var(--text-main)' }}>{scannedItem.name}</strong> será retirado de{' '}
+              <strong style={{ color: 'var(--coficab-copper)' }}>{scannedItem.assignedTo}</strong> y regresará al almacén IT.
+              El checklist anterior quedará anulado.
+            </p>
+            <form onSubmit={handleUnassign}>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Motivo de Devolución (Opcional)</label>
+                <input type="text" className="form-input" value={unassignNotes} onChange={e => setUnassignNotes(e.target.value)} placeholder="ej. Cambio de área, equipo no compatible, baja del colaborador..." />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowUnassignModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={unassignSubmitting} style={{ background: 'linear-gradient(135deg, #d97706 0%, #b07238 100%)' }}>
+                  {unassignSubmitting ? 'Procesando...' : '↩️ Confirmar Devolución'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: REPORTAR FALLA ─── */}
+      {showFaultModal && scannedItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <AlertTriangle size={24} style={{ color: '#f59e0b' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>Reportar Falla / Daño</h3>
+              </div>
+              <button onClick={() => setShowFaultModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={22} /></button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Equipo: <strong style={{ color: 'var(--text-main)' }}>{scannedItem.name}</strong> — Quedará marcado como <span style={{ color: '#f59e0b', fontWeight: 700 }}>Con Falla</span> y visible en la pestaña de equipos dañados.
+            </p>
+            <form onSubmit={handleReportFault}>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Descripción de la Falla / Daño *</label>
+                <textarea className="form-input" rows={3} value={faultText} onChange={e => setFaultText(e.target.value)} placeholder="ej. Pantalla rota, no enciende, teclado con teclas pegadas..." required style={{ resize: 'vertical' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowFaultModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={faultSubmitting || !faultText.trim()} style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
+                  {faultSubmitting ? 'Reportando...' : '⚠️ Reportar Falla'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: MARCAR REPARADO ─── */}
+      {showRepairModal && scannedItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <CheckSquare size={24} style={{ color: '#10b981' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>Marcar como Reparado</h3>
+              </div>
+              <button onClick={() => setShowRepairModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={22} /></button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              Falla registrada: <strong style={{ color: '#f59e0b' }}>{scannedItem.faults}</strong>
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              El equipo quedará <span style={{ color: '#10b981', fontWeight: 700 }}>Disponible</span> en el almacén IT para ser asignado nuevamente.
+            </p>
+            <form onSubmit={handleRepair}>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Notas de Reparación (Opcional)</label>
+                <input type="text" className="form-input" value={repairNotes} onChange={e => setRepairNotes(e.target.value)} placeholder="ej. Se reemplazó pantalla, se formateó, se actualizó BIOS..." />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowRepairModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={repairSubmitting} style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+                  {repairSubmitting ? 'Guardando...' : '✅ Confirmar Reparación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: DAR DE BAJA ─── */}
+      {showDecommissionModal && scannedItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Trash2 size={24} style={{ color: '#f43f5e' }} />
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>Dar de Baja / Enviar a Scrap</h3>
+              </div>
+              <button onClick={() => setShowDecommissionModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={22} /></button>
+            </div>
+            <div style={{ padding: '0.85rem', background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.3)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }}>
+              <p style={{ color: '#f43f5e', fontSize: '0.88rem', fontWeight: 700 }}>
+                ⚠️ Esta acción es irreversible (solo Administradores pueden reactivar desde el panel web).
+              </p>
+            </div>
+            <form onSubmit={handleDecommission}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Motivo de Baja *</label>
+                <select className="form-input" value={decommReason} onChange={e => setDecommReason(e.target.value)} required>
+                  <option value="">— Seleccionar motivo —</option>
+                  <option value="Daño irreparable">Daño irreparable</option>
+                  <option value="Obsolescencia tecnológica">Obsolescencia tecnológica</option>
+                  <option value="Pérdida o robo">Pérdida o robo</option>
+                  <option value="Fin de vida útil">Fin de vida útil</option>
+                  <option value="Reemplazo por nuevo equipo">Reemplazo por nuevo equipo</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Observaciones Adicionales</label>
+                <input type="text" className="form-input" value={decommNotes} onChange={e => setDecommNotes(e.target.value)} placeholder="ej. Equipo enviado a E-Waste, número de folio..." />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDecommissionModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={decommSubmitting || !decommReason} style={{ background: 'linear-gradient(135deg, #f43f5e 0%, #dc2626 100%)' }}>
+                  {decommSubmitting ? 'Procesando...' : '🗑️ Confirmar Baja'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
