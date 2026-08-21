@@ -127,7 +127,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                     </td>
                   </tr>
                   {!isCollapsed && catItems.map((item) => {
-                  const isOwnPlantItem = isSuperAdmin || !item.originPlant || item.originPlant === user?.plant;
+                  const isOwnPlantItem = isSuperAdmin || isSuper || isAdmin || !item.originPlant || !user?.plant || item.originPlant === user?.plant || item.plant === user?.plant;
                   return (
                     <tr
                       key={item.id}
