@@ -702,6 +702,12 @@ router.post('/:id/unassign', requireAdmin, async (req: AuthenticatedRequest, res
         }
       });
 
+      // Void any past checklists so subsequent assignment demands a brand new checklist
+      await tx.deviceChecklist.updateMany({
+        where: { itemId: id, status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+        data: { status: 'VOIDED' }
+      });
+
       return updated;
     });
 

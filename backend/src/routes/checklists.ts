@@ -231,13 +231,13 @@ router.post('/:id/apply-template', async (req: AuthenticatedRequest, res: Respon
   }
 });
 
-// GET /api/checklists/item/:itemId - Get the active checklist for an item
+// GET /api/checklists/item/:itemId - Get the active in-progress checklist for an item
 router.get('/item/:itemId', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { itemId } = req.params;
 
     const checklist = await prisma.deviceChecklist.findFirst({
-      where: { itemId, status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+      where: { itemId, status: 'IN_PROGRESS' },
       orderBy: { createdAt: 'desc' },
       include: {
         item: { select: { sku: true, name: true, plant: true } },
