@@ -197,3 +197,18 @@ model DeviceChecklist {
   @@index([status])
   @@index([createdById])
 }
+
+model ChecklistTemplate {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  plant        String?
+  sectionsJson String   // JSON format: { sectionA: [{id, label}], sectionB: [{id, label}] }
+  isDefault    Boolean  @default(false)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([plant])
+  @@index([name])
+}

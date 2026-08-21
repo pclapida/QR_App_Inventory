@@ -49,9 +49,184 @@ const buildEmptyChecklist = () => ({
   sectionB: CHECKLIST_TEMPLATE.sectionB.map(item => ({ ...item, value: null as string | null })),
 });
 
-// GET /api/checklists/template - Return the checklist template items
+// GET /api/checklists/template - Return the legacy default checklist template
 router.get('/template', (_req, res) => {
   return res.json({ template: CHECKLIST_TEMPLATE });
+});
+
+// GET /api/checklists/templates - List all saved templates
+router.get('/templates', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const dbTemplates = await prisma.checklistTemplate.findMany({
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }]
+    });
+
+    // If no default template exists in DB yet, create it
+    const hasDefault = dbTemplates.some(t => t.isDefault || t.name === 'Estándar Corporativo');
+    if (!hasDefault) {
+      const defaultTpl = await prisma.checklistTemplate.create({
+        data: {
+          name: 'Estándar Corporativo',
+          description: 'Plantilla estándar predeterminada para entrega de equipos y workstations',
+          plant: null,
+          sectionsJson: JSON.stringify(CHECKLIST_TEMPLATE),
+          isDefault: true,
+          createdById: req.user?.id || null
+        }
+      });
+      return res.json({ templates: [defaultTpl, ...dbTemplates] });
+    }
+
+    return res.json({ templates: dbTemplates });
+  } catch (err: any) {
+    console.error('Error fetching templates:', err);
+    return res.status(500).json({ error: 'Error al obtener las plantillas de checklist' });
+  }
+});
+
+// POST /api/checklists/templates - Create or update a custom template
+router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { name, description, plant, sections } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'El nombre de la plantilla es obligatorio' });
+    }
+
+    if (!sections || (!sections.sectionA && !sections.sectionB)) {
+      return res.status(400).json({ error: 'La estructura de secciones es requerida' });
+    }
+
+    // Format clean template sections (only id and label)
+    const cleanSections = {
+      sectionA: (sections.sectionA || []).map((item: any) => ({
+        id: item.id || Date.now(),
+        label: item.label
+      })),
+      sectionB: (sections.sectionB || []).map((item: any) => ({
+        id: item.id || Date.now(),
+        label: item.label
+      }))
+    };
+
+    const existing = await prisma.checklistTemplate.findUnique({
+      where: { name: name.trim() }
+    });
+
+    let template;
+    if (existing) {
+      template = await prisma.checklistTemplate.update({
+        where: { id: existing.id },
+        data: {
+          description: description?.trim() || existing.description,
+          plant: plant || existing.plant,
+          sectionsJson: JSON.stringify(cleanSections),
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      template = await prisma.checklistTemplate.create({
+        data: {
+          name: name.trim(),
+          description: description?.trim() || null,
+          plant: plant || null,
+          sectionsJson: JSON.stringify(cleanSections),
+          isDefault: false,
+          createdById: req.user?.id || null
+        }
+      });
+    }
+
+    return res.status(201).json({
+      template,
+      message: `Plantilla "${template.name}" guardada exitosamente`
+    });
+  } catch (err: any) {
+    console.error('Error saving template:', err);
+    return res.status(500).json({ error: 'Error al guardar la plantilla' });
+  }
+});
+
+// DELETE /api/checklists/templates/:templateId - Delete a custom template
+router.delete('/templates/:templateId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { templateId } = req.params;
+
+    const template = await prisma.checklistTemplate.findUnique({
+      where: { id: templateId }
+    });
+
+    if (!template) {
+      return res.status(404).json({ error: 'Plantilla no encontrada' });
+    }
+
+    if (template.isDefault) {
+      return res.status(400).json({ error: 'No se puede eliminar la plantilla estándar del sistema' });
+    }
+
+    await prisma.checklistTemplate.delete({
+      where: { id: templateId }
+    });
+
+    return res.json({ message: `Plantilla "${template.name}" eliminada exitosamente` });
+  } catch (err: any) {
+    console.error('Error deleting template:', err);
+    return res.status(500).json({ error: 'Error al eliminar la plantilla' });
+  }
+});
+
+// POST /api/checklists/:id/apply-template - Apply a template to an in-progress checklist
+router.post('/:id/apply-template', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { templateId } = req.body;
+
+    const checklist = await prisma.deviceChecklist.findUnique({ where: { id } });
+    if (!checklist) {
+      return res.status(404).json({ error: 'Checklist no encontrado' });
+    }
+    if (checklist.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ error: 'Solo se puede aplicar plantilla a un checklist en progreso' });
+    }
+
+    let templateSections = CHECKLIST_TEMPLATE;
+    if (templateId && templateId !== 'default') {
+      const template = await prisma.checklistTemplate.findUnique({
+        where: { id: templateId }
+      });
+      if (template) {
+        templateSections = JSON.parse(template.sectionsJson);
+      }
+    }
+
+    const newData = {
+      sectionA: (templateSections.sectionA || []).map((item: any) => ({
+        id: item.id,
+        label: item.label,
+        value: null
+      })),
+      sectionB: (templateSections.sectionB || []).map((item: any) => ({
+        id: item.id,
+        label: item.label,
+        value: null
+      }))
+    };
+
+    const updated = await prisma.deviceChecklist.update({
+      where: { id },
+      data: {
+        checklistData: JSON.stringify(newData)
+      }
+    });
+
+    return res.json({
+      checklist: updated,
+      message: 'Plantilla aplicada exitosamente al checklist'
+    });
+  } catch (err: any) {
+    console.error('Error applying template:', err);
+    return res.status(500).json({ error: 'Error al aplicar la plantilla' });
+  }
 });
 
 // GET /api/checklists/item/:itemId - Get the active checklist for an item

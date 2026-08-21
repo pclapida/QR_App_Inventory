@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, CheckCircle2, Clock, AlertCircle, Lock,
-  User, ChevronRight, Loader2, Eye, EyeOff, Shield, Plus, Trash2, Check
+  User, ChevronRight, Loader2, Eye, EyeOff, Shield, Plus, Trash2, Check,
+  Bookmark, Save, Settings, X, Layers, FileText, Sparkles
 } from 'lucide-react';
 import { checklistApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -160,6 +161,88 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
   // Password modal state
   const [showPasswordModal, setShowPasswordModal] = useState<null | 'sign' | 'complete'>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Templates state
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showManageTemplatesModal, setShowManageTemplatesModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDesc, setTemplateDesc] = useState('');
+  const [templatePlant, setTemplatePlant] = useState(user?.plant || 'Planta 2');
+  const [templateActionLoading, setTemplateActionLoading] = useState(false);
+  const [templateSuccessMsg, setTemplateSuccessMsg] = useState<string | null>(null);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await checklistApi.getTemplates();
+      setTemplates(res.data.templates || []);
+    } catch (err) {
+      console.error('Error cargando plantillas:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  const handleApplyTemplate = async (templateId: string) => {
+    if (!checklist || !templateId) return;
+    if (checklist.status !== 'IN_PROGRESS') return;
+    
+    setSaving(true);
+    try {
+      const res = await checklistApi.applyTemplate(checklist.id, templateId);
+      const updatedCl = res.data.checklist;
+      setChecklist(updatedCl);
+      setData(JSON.parse(updatedCl.checklistData || '{}'));
+      setSelectedTemplateId(templateId);
+      setTemplateSuccessMsg('Plantilla cargada exitosamente.');
+      setTimeout(() => setTemplateSuccessMsg(null), 3500);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Error al aplicar plantilla');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveCurrentAsTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!data || !templateName.trim()) return;
+
+    setTemplateActionLoading(true);
+    try {
+      await checklistApi.saveTemplate({
+        name: templateName.trim(),
+        description: templateDesc.trim() || undefined,
+        plant: templatePlant || undefined,
+        sections: data
+      });
+      await fetchTemplates();
+      setShowSaveTemplateModal(false);
+      setTemplateName('');
+      setTemplateDesc('');
+      setTemplateSuccessMsg(`Plantilla "${templateName.trim()}" guardada exitosamente.`);
+      setTimeout(() => setTemplateSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Error al guardar la plantilla');
+    } finally {
+      setTemplateActionLoading(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string, name: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar la plantilla "${name}"?`)) return;
+    try {
+      await checklistApi.deleteTemplate(id);
+      await fetchTemplates();
+      if (selectedTemplateId === id) setSelectedTemplateId('');
+      setTemplateSuccessMsg(`Plantilla "${name}" eliminada.`);
+      setTimeout(() => setTemplateSuccessMsg(null), 3000);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Error al eliminar la plantilla');
+    }
+  };
 
   const sectionALabel = 'Usuario Local (Configuración de PC)';
   const sectionBLabel = 'Usuario Dominio (Configuración de Red/AD)';
@@ -358,6 +441,119 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
         </div>
       )}
 
+      {/* Template Toolbar */}
+      {checklist?.status === 'IN_PROGRESS' && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '0.85rem 1.1rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.8rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--coficab-copper)', fontWeight: 700, fontSize: '0.88rem' }}>
+              <Layers size={17} />
+              <span>Plantilla:</span>
+            </div>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => handleApplyTemplate(e.target.value)}
+              disabled={saving}
+              style={{
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '0.45rem 0.85rem',
+                color: 'var(--text-main)',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                outline: 'none',
+                minWidth: '220px',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="" disabled>-- Cargar plantilla predefinida --</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.isDefault ? `⭐ ${t.name} (Predeterminada)` : `📄 ${t.name}${t.plant ? ` (${t.plant})` : ''}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowSaveTemplateModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                background: 'rgba(14, 165, 233, 0.12)',
+                border: '1px solid rgba(14, 165, 233, 0.35)',
+                color: '#38bdf8',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              title="Guardar la estructura actual como una plantilla reutilizable"
+            >
+              <Save size={15} />
+              Guardar como plantilla
+            </button>
+
+            {templates.filter(t => !t.isDefault).length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowManageTemplatesModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'transparent',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-muted)',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+                title="Administrar o borrar plantillas personalizadas"
+              >
+                <Settings size={15} />
+                Gestionar ({templates.filter(t => !t.isDefault).length})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {templateSuccessMsg && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid #10b981',
+          color: '#34d399',
+          padding: '0.65rem 1rem',
+          borderRadius: '8px',
+          marginBottom: '1.25rem',
+          fontSize: '0.87rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <CheckCircle2 size={16} />
+          {templateSuccessMsg}
+        </div>
+      )}
+
       {data && (
         <>
           {/* Section A */}
@@ -440,6 +636,241 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
           onCancel={() => setShowPasswordModal(null)}
           loading={passwordLoading}
         />
+      )}
+      {/* Save Template Modal */}
+      {showSaveTemplateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1.5px solid var(--border-color)',
+            borderRadius: '16px', padding: '1.75rem', width: '450px', maxWidth: '95vw',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Bookmark size={20} style={{ color: 'var(--coficab-copper)' }} />
+                <h3 style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-main)', margin: 0 }}>
+                  Guardar Plantilla de Checklist
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveTemplateModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCurrentAsTemplate}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                  Nombre de la Plantilla *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. Laptop Planta 1 - Estándar / UPCAST Mantenimiento"
+                  value={templateName}
+                  onChange={e => setTemplateName(e.target.value)}
+                  style={{
+                    width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-main)',
+                    border: '1.5px solid var(--border-color)', borderRadius: '8px',
+                    color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                  Planta Asociada (Opcional)
+                </label>
+                <select
+                  value={templatePlant}
+                  onChange={e => setTemplatePlant(e.target.value)}
+                  style={{
+                    width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-main)',
+                    border: '1.5px solid var(--border-color)', borderRadius: '8px',
+                    color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="Planta 1">Planta 1</option>
+                  <option value="Planta 2">Planta 2</option>
+                  <option value="Planta 3">Planta 3</option>
+                  <option value="Planta UPCAST">Planta UPCAST</option>
+                  <option value="">Todas las Plantas (Global)</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.83rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                  Descripción o Notas (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej. Aplica para laptops administrativas entregadas en Planta 1"
+                  value={templateDesc}
+                  onChange={e => setTemplateDesc(e.target.value)}
+                  style={{
+                    width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-main)',
+                    border: '1.5px solid var(--border-color)', borderRadius: '8px',
+                    color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px',
+                marginBottom: '1.5rem', fontSize: '0.82rem', color: 'var(--text-muted)'
+              }}>
+                ℹ️ Esta plantilla guardará los {data?.sectionA?.length || 0} ítems de la Sección A y {data?.sectionB?.length || 0} ítems de la Sección B actuales para reutilizarlos en futuros checklists.
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowSaveTemplateModal(false)}
+                  style={{
+                    flex: 1, padding: '0.7rem', background: 'transparent',
+                    border: '1.5px solid var(--border-color)', borderRadius: '8px',
+                    color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={templateActionLoading || !templateName.trim()}
+                  style={{
+                    flex: 1.5, padding: '0.7rem', background: 'var(--coficab-copper)',
+                    border: 'none', borderRadius: '8px', color: '#fff',
+                    cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    opacity: templateActionLoading || !templateName.trim() ? 0.6 : 1
+                  }}
+                >
+                  {templateActionLoading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
+                  Guardar Plantilla
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Templates Modal */}
+      {showManageTemplatesModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1.5px solid var(--border-color)',
+            borderRadius: '16px', padding: '1.75rem', width: '550px', maxWidth: '95vw',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)', maxHeight: '80vh', display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Settings size={20} style={{ color: 'var(--coficab-copper)' }} />
+                <h3 style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-main)', margin: 0 }}>
+                  Gestionar Plantillas de Checklist
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManageTemplatesModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingRight: '0.25rem' }}>
+              {templates.map((tpl) => {
+                let count = 0;
+                try {
+                  const s = JSON.parse(tpl.sectionsJson || '{}');
+                  count = (s.sectionA?.length || 0) + (s.sectionB?.length || 0);
+                } catch { count = 0; }
+
+                return (
+                  <div key={tpl.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid var(--border-color)', borderRadius: '10px'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.92rem' }}>
+                          {tpl.name}
+                        </span>
+                        {tpl.isDefault && (
+                          <span style={{
+                            fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px',
+                            background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontWeight: 700
+                          }}>
+                            Predeterminada
+                          </span>
+                        )}
+                        {tpl.plant && (
+                          <span style={{
+                            fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px',
+                            background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', fontWeight: 600
+                          }}>
+                            {tpl.plant}
+                          </span>
+                        )}
+                      </div>
+                      {tpl.description && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                          {tpl.description}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>
+                        {count} elementos configurados
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {!tpl.isDefault && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTemplate(tpl.id, tpl.name)}
+                          title="Eliminar plantilla"
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)',
+                            color: '#ef4444', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowManageTemplatesModal(false)}
+                style={{
+                  padding: '0.65rem 1.5rem', background: 'var(--bg-main)',
+                  border: '1.5px solid var(--border-color)', borderRadius: '8px',
+                  color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

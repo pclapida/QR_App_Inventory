@@ -288,8 +288,31 @@ export const adminApi = {
 };
 
 // Checklist API
+export interface ChecklistTemplateItem {
+  id: number;
+  label: string;
+}
+
+export interface ChecklistTemplateData {
+  id: string;
+  name: string;
+  description?: string;
+  plant?: string;
+  sectionsJson: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const checklistApi = {
   getTemplate: () => api.get('/checklists/template'),
+  getTemplates: () => api.get<{ templates: ChecklistTemplateData[] }>('/checklists/templates'),
+  saveTemplate: (data: { name: string; description?: string; plant?: string; sections: any }) =>
+    api.post<{ template: ChecklistTemplateData; message: string }>('/checklists/templates', data),
+  deleteTemplate: (templateId: string) =>
+    api.delete<{ message: string }>(`/checklists/templates/${templateId}`),
+  applyTemplate: (checklistId: string, templateId: string) =>
+    api.post(`/checklists/${checklistId}/apply-template`, { templateId }),
   getByItem: (itemId: string) => api.get(`/checklists/item/${itemId}`),
   create: (itemId: string) => api.post('/checklists', { itemId }),
   updateItems: (checklistId: string, checklistData: any, section: string) =>
