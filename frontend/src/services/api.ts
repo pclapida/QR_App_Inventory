@@ -15,7 +15,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 /**
  * Determina si un equipo requiere Checklist técnico pre-asignación obligatorio.
- * Requerido para: Laptop, PC, MiniPC, Tablet y Paneles.
+ * REGLA ESTRICTA: Solo requerido para Laptop, PC / Computadora de Escritorio, MiniPC, Tablet y Paneles.
+ * NUNCA para: USBs, Mouses, Teclados, Monitores, Impresoras, Lectores, Consumibles, etc.
  */
 export const isDeviceRequiringChecklist = (item: { category?: string | null; name?: string | null; model?: string | null } | null | undefined): boolean => {
   if (!item) return false;
@@ -24,31 +25,50 @@ export const isDeviceRequiringChecklist = (item: { category?: string | null; nam
   const model = (item.model || '').toLowerCase().trim();
   const combined = `${cat} ${name} ${model}`;
 
+  // 1. Descarte inmediato de accesorios, consumibles y periféricos que jamás llevan checklist
+  if (
+    cat === 'accesorios usb' ||
+    cat === 'consumibles' ||
+    cat === 'herramientas' ||
+    cat === 'refacciones it' ||
+    cat === 'periféricos' ||
+    cat === 'perifericos' ||
+    cat.includes('impresora') ||
+    cat.includes('monitor') ||
+    cat.includes('scanner')
+  ) {
+    return false;
+  }
+
+  // Si el nombre o modelo indica que es un accesorio o periférico
+  const isPeripheralOrAccessory = /\b(usb|pendrive|flash drive|memoria|mouse|raton|ratón|teclado|keyboard|monitor|impresora|printer|zebra|scanner|escaner|escáner|lector|cable|adaptador|cargador|charger|diadema|headset|auricular)\b/i.test(
+    `${name} ${model}`
+  );
+
+  if (isPeripheralOrAccessory) {
+    const isExplicitComputer = /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|tablet|ipad|minipc|mini[- ]pc|desktop|optiplex|thinkcentre|workstation|panel industrial)\b/i.test(
+      name
+    );
+    if (!isExplicitComputer) {
+      return false;
+    }
+  }
+
+  // 2. Comprobación estricta de categorías permitidas
   if (
     cat === 'laptops' ||
+    cat === 'laptops & cómputo' ||
+    cat === 'laptops & computo' ||
     cat === 'tablets' ||
     cat === 'paneles' ||
-    cat.includes('panel') ||
-    cat.includes('mini pc') ||
-    cat.includes('desktop')
+    cat === 'mini pcs & desktops'
   ) {
     return true;
   }
 
-  return (
-    combined.includes('laptop') ||
-    combined.includes('notebook') ||
-    combined.includes('tablet') ||
-    combined.includes('ipad') ||
-    combined.includes('panel') ||
-    combined.includes('paneles') ||
-    combined.includes('minipc') ||
-    combined.includes('mini pc') ||
-    combined.includes('mini-pc') ||
-    combined.includes('pc ') ||
-    combined.startsWith('pc') ||
-    combined.includes('computadora') ||
-    combined.includes('desktop')
+  // 3. Verificación de palabras clave
+  return /\b(laptop|notebook|thinkpad|macbook|latitude|elitebook|pc|desktop|computadora|minipc|mini[- ]pc|optiplex|thinkcentre|workstation|tablet|ipad|galaxy tab|panel|paneles)\b/i.test(
+    combined
   );
 };
 
