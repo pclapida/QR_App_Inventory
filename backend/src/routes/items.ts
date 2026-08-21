@@ -270,8 +270,15 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
       whereClause.category = category.trim();
     }
 
-    if (plant && typeof plant === 'string' && plant.trim() !== '') {
-      whereClause.plant = plant.trim();
+    // Plant filtering
+    // If the authenticated user is NOT SUPERADMIN and has an assigned plant, enforce that plant!
+    let targetPlant = plant;
+    if (req.user && req.user.role !== 'SUPERADMIN' && req.user.plant) {
+      targetPlant = req.user.plant;
+    }
+
+    if (targetPlant && typeof targetPlant === 'string' && targetPlant.trim() !== '') {
+      whereClause.plant = targetPlant.trim();
     }
 
     if (q && typeof q === 'string' && q.trim() !== '') {

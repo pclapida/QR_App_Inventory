@@ -84,8 +84,17 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
+  const [selectedPlant, setSelectedPlant] = useState<string>(() => {
+    if (user?.role === 'SUPERADMIN' || !user?.plant) return '';
+    return user.plant;
+  });
   const [onlyLowStock, setOnlyLowStock] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (user?.role !== 'SUPERADMIN' && user?.plant) {
+      setSelectedPlant(user.plant);
+    }
+  }, [user]);
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -813,21 +822,42 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
           )}
         </div>
 
-        {/* Planta Filter (All plants available) */}
+        {/* Planta Filter (Dropdown for SuperAdmin, locked indicator for single-plant users) */}
         {activeTab !== 'LOANS' && (
-          <div style={{ width: '180px' }}>
-            <select
-              className="form-input"
-              value={selectedPlant}
-              onChange={(e) => setSelectedPlant(e.target.value)}
-              style={{ fontSize: '0.85rem' }}
-            >
-              <option value="">Todas las Plantas</option>
-              <option value="Planta 1">Planta 1</option>
-              <option value="Planta 2">Planta 2 (Principal)</option>
-              <option value="Planta 3">Planta 3</option>
-              <option value="Planta UPCAST">Planta UPCAST</option>
-            </select>
+          <div style={{ width: '190px' }}>
+            {isSuper || !user?.plant ? (
+              <select
+                className="form-input"
+                value={selectedPlant}
+                onChange={(e) => setSelectedPlant(e.target.value)}
+                style={{ fontSize: '0.85rem' }}
+              >
+                <option value="">Todas las Plantas</option>
+                <option value="Planta 1">Planta 1</option>
+                <option value="Planta 2">Planta 2 (Principal)</option>
+                <option value="Planta 3">Planta 3</option>
+                <option value="Planta UPCAST">Planta UPCAST</option>
+              </select>
+            ) : (
+              <div
+                className="form-input"
+                style={{
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--coficab-copper)',
+                  fontWeight: 800,
+                  cursor: 'default'
+                }}
+                title={`Inventario restringido a ${user.plant}`}
+              >
+                <MapPin size={14} style={{ color: 'var(--coficab-copper)', flexShrink: 0 }} />
+                <span>{user.plant}</span>
+              </div>
+            )}
           </div>
         )}
 
