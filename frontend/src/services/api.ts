@@ -15,7 +15,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 /**
  * Determina si un equipo requiere Checklist técnico pre-asignación obligatorio.
- * Solo requerido para: Laptop, PC, MiniPC y Tablet.
+ * Requerido para: Laptop, PC, MiniPC, Tablet y Paneles.
  */
 export const isDeviceRequiringChecklist = (item: { category?: string | null; name?: string | null; model?: string | null } | null | undefined): boolean => {
   if (!item) return false;
@@ -27,6 +27,8 @@ export const isDeviceRequiringChecklist = (item: { category?: string | null; nam
   if (
     cat === 'laptops' ||
     cat === 'tablets' ||
+    cat === 'paneles' ||
+    cat.includes('panel') ||
     cat.includes('mini pc') ||
     cat.includes('desktop')
   ) {
@@ -38,6 +40,8 @@ export const isDeviceRequiringChecklist = (item: { category?: string | null; nam
     combined.includes('notebook') ||
     combined.includes('tablet') ||
     combined.includes('ipad') ||
+    combined.includes('panel') ||
+    combined.includes('paneles') ||
     combined.includes('minipc') ||
     combined.includes('mini pc') ||
     combined.includes('mini-pc') ||

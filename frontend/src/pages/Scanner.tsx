@@ -72,6 +72,11 @@ const MAINTENANCE_MATRIX: { [key: string]: { frequency: string; days: number; ta
     frequency: 'Cada 4 meses',
     days: 120,
     tasks: ['Limpieza', 'Hardware físico', 'Revisión de cableado', 'Pruebas de conexión']
+  },
+  Paneles: {
+    frequency: 'Cada 4 meses',
+    days: 120,
+    tasks: ['Limpieza de display/pantalla táctil', 'Revisión de cableado y energía', 'Prueba de calibración y respuesta', 'Inspección de montaje y temperatura']
   }
 };
 
@@ -258,7 +263,8 @@ export const Scanner: React.FC = () => {
     if (!scannedItem) return;
     let devType = 'Laptop';
     const lower = (scannedItem.name + ' ' + (scannedItem.category || '')).toLowerCase();
-    if (lower.includes('laptop')) devType = 'Laptop';
+    if (lower.includes('panel') || lower.includes('paneles')) devType = 'Paneles';
+    else if (lower.includes('laptop')) devType = 'Laptop';
     else if (lower.includes('tablet')) devType = 'Tablet';
     else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
     else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';
@@ -288,7 +294,8 @@ export const Scanner: React.FC = () => {
 
     let devType = 'Laptop';
     const lower = (scannedItem.name + ' ' + (scannedItem.category || '')).toLowerCase();
-    if (lower.includes('laptop')) devType = 'Laptop';
+    if (lower.includes('panel') || lower.includes('paneles')) devType = 'Paneles';
+    else if (lower.includes('laptop')) devType = 'Laptop';
     else if (lower.includes('tablet')) devType = 'Tablet';
     else if (lower.includes('línea') || lower.includes('linea') || lower.includes('producción') || lower.includes('produccion')) devType = 'Líneas de Producción';
     else if (lower.includes('pc') || lower.includes('minipc') || lower.includes('computadora')) devType = 'PC';

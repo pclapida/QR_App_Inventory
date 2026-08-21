@@ -346,11 +346,17 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({ item, onClose, onS
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               >
+                <option value="Paneles">Paneles</option>
                 <option value="Equipos & Dispositivos">Equipos & Dispositivos</option>
                 <option value="Hardware & Lectores">Hardware & Lectores</option>
+                <option value="Laptops & Cómputo">Laptops & Cómputo</option>
+                <option value="Monitores & Pantallas">Monitores & Pantallas</option>
+                <option value="Tablets">Tablets</option>
+                <option value="Impresoras Zebra">Impresoras Zebra</option>
                 <option value="Consumibles">Consumibles</option>
                 <option value="Maquinaria">Maquinaria</option>
                 <option value="Herramientas">Herramientas</option>
+                <option value="Refacciones IT">Refacciones IT</option>
               </select>
             </div>
 

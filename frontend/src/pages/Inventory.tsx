@@ -841,6 +841,7 @@ export const Inventory: React.FC<InventoryProps> = ({ mode }) => {
               style={{ fontSize: '0.85rem' }}
             >
               <option value="">Todas las Categorías</option>
+              <option value="Paneles">Paneles</option>
               <option value="Laptops & Cómputo">Laptops & Cómputo</option>
               <option value="Monitores & Pantallas">Monitores & Pantallas</option>
               <option value="Tablets">Tablets</option>

@@ -194,6 +194,7 @@ export const AddItem: React.FC = () => {
               onChange={(e) => setCategory(e.target.value)}
               style={{ fontSize: '1.05rem', fontWeight: 700, borderColor: 'var(--border-copper)' }}
             >
+              <option value="Paneles">Paneles (Panel Industrial / Display)</option>
               <option value="Equipos & Dispositivos">Equipos & Dispositivos (Activo Fijo)</option>
               <option value="Hardware & Lectores">Hardware & Lectores (Activo Fijo)</option>
               <option value="Laptops & Cómputo">Laptops & Cómputo</option>

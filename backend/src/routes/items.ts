@@ -42,6 +42,7 @@ const determinePlant = (name: string, sku: string, model: string, defaultPlant: 
 const determineCategory = (name: string, model: string, defaultCategory: string): string => {
   const text = `${name || ''} ${model || ''}`.toLowerCase();
   
+  if (text.includes('panel') || text.includes('paneles')) return 'Paneles';
   if (text.includes('laptop') || text.includes('notebook')) return 'Laptops';
   if (text.includes('monitor') || text.includes('pantalla')) return 'Monitores';
   if (text.includes('mini pc') || text.includes('minipc') || text.includes('desktop') || text.includes('optiplex') || text.includes('thinkcentre')) return 'Mini PCs & Desktops';
